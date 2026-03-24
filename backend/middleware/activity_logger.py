@@ -29,75 +29,26 @@ async def activity_logger_middleware(request: Request, call_next: Callable) -> R
     start_time = time.time()
     response = await call_next(request)
     
-    # Only log mutating operations
-    if request.method not in ["POST", "PUT", "DELETE"] or response.status_code >= 400:
+    import logging
+
+    from fastapi import Request
+
+    logger = logging.getLogger(__name__)
+
+
+    async def activity_logger_middleware(request: Request, call_next):
+        response = await call_next(request)
+
+        if request.method in {"POST", "PUT", "DELETE", "PATCH"}:
+            logger.info(
+                "audit_request",
+                extra={
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status_code": response.status_code,
+                    "client": request.client.host if request.client else None,
+                },
+            )
+
         return response
-    
-    # Get user from request state (set by auth dependency)
-    user = getattr(request.state, "user", None)
-    if not user:
-        return response
-    
-    # Determine points for this action
-    path = str(request.url.path)
-    points = POINTS_MAP.get(path, 0)
-    
-    # If not in static map, try to get from database config
-    if points == 0:
-        db = SessionLocal()
-        try:
-            config = db.query(PointsConfig).filter(
-                PointsConfig.action == path,
-                PointsConfig.is_active == True
-            ).first()
-            if config:
                 points = config.points
-        finally:
-            db.close()
-    
-    # Log the activity
-    try:
-        db = SessionLocal()
-        
-        # Extract request body if available
-        detail = f"{request.method} {path}"
-        try:
-            if request.method in ["POST", "PUT"]:
-                body = await request.body()
-                if body:
-                    detail = json.dumps(json.loads(body))
-        except:
-            pass
-        
-        activity = ActivityLog(
-            user_id=user.id,
-            action=f"{request.method} {path}",
-            target=path,
-            detail=detail,
-            points=points
-        )
-        
-        db.add(activity)
-        
-        # Update user's points
-        user.points += points
-        db.add(user)
-        
-        db.commit()
-    except Exception as e:
-        print(f"Error logging activity: {str(e)}")
-    finally:
-        db.close()
-    
-    return response
-
-
-async def calculate_request_time_middleware(request: Request, call_next: Callable) -> Response:
-    """Middleware to calculate and log request processing time"""
-    start_time = time.time()
-    response = await call_next(request)
-    
-    process_time = time.time() - start_time
-    response.headers["X-Process-Time"] = str(process_time)
-    
-    return response

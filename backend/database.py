@@ -1,36 +1,36 @@
+from typing import Generator
+
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy.pool import NullPool
-import os
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://admin:secret@db/vortex"
-)
+from config import get_settings
 
-# Create engine with connection pooling
-engine = create_engine(
-    DATABASE_URL,
-    poolclass=NullPool,
-    echo=os.getenv("DEBUG", "false").lower() == "true"
-)
-
-SessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=engine
-)
+settings = get_settings()
 
 Base = declarative_base()
 
-def get_db():
-    """Dependency for FastAPI to get database session"""
+
+engine = create_engine(
+    settings.database_url,
+    pool_pre_ping=True,
+    pool_size=settings.db_pool_size,
+    max_overflow=settings.db_max_overflow,
+    echo=settings.debug,
+)
+
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, class_=Session)
+
+
+def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
 
-def init_db():
-    """Initialize database by creating all tables"""
+
+def init_db() -> None:
+    # Local import avoids circular import during app startup.
+    import models  # noqa: F401
+
     Base.metadata.create_all(bind=engine)

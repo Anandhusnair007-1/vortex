@@ -44,9 +44,7 @@ async def create_user(
     """Create a new user (admin only)"""
     
     # Check if user already exists
-    existing_user = db.query(User).filter(
-        (User.username == request.username) | (User.email == request.email)
-    ).first()
+    existing_user = db.query(User).filter((User.username == request.username) | (User.email == request.email)).first()
     
     if existing_user:
         raise HTTPException(

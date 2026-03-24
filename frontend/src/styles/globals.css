@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  @apply transition-colors duration-200;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+}
+
+::-webkit-scrollbar {
+  @apply w-2;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-slate-100;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-300 rounded-full hover:bg-slate-400;
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+  }
+
+  .btn-primary {
+    @apply btn bg-slate-900 text-white hover:bg-slate-800;
+  }
+
+  .btn-secondary {
+    @apply btn bg-slate-200 text-slate-900 hover:bg-slate-300;
+  }
+
+  .btn-sm {
+    @apply px-2 py-1 text-sm;
+  }
+
+  .card {
+    @apply bg-white rounded-lg shadow p-4 border border-slate-200;
+  }
+
+  .input {
+    @apply w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent;
+  }
+
+  .badge {
+    @apply inline-block px-2 py-1 text-xs font-semibold rounded-full;
+  }
+
+  .alert-badge {
+    @apply badge;
+  }
+
+  .severity-critical {
+    @apply bg-red-100 text-red-800;
+  }
+
+  .severity-warning {
+    @apply bg-amber-100 text-amber-800;
+  }
+
+  .severity-info {
+    @apply bg-blue-100 text-blue-800;
+  }
+}

@@ -41,7 +41,7 @@ sudo mkdir -p /opt/vortex
 cd /opt/vortex
 
 # Clone repository
-sudo git clone https://github.com/your-org/vortex .
+sudo git clone https://github.com/Anandhusnair007-1/vortex.git .
 
 # Set ownership
 sudo chown -R $USER:$USER /opt/vortex

@@ -1,4 +1,4 @@
-# Vortex Platform - Quick Start Guide
+# Vortex IT Operations Platform - Quick Start Guide
 
 Get up and running in 15 minutes.
 
@@ -14,7 +14,7 @@ Get up and running in 15 minutes.
 ### 1. Clone and Navigate
 
 ```bash
-git clone https://github.com/your-company/vortex.git /opt/vortex
+git clone https://github.com/Anandhusnair007-1/vortex.git /opt/vortex
 cd /opt/vortex
 ```
 

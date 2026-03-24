@@ -1,190 +1,264 @@
-from fastapi import APIRouter, HTTPException, status, Depends, Query
-from sqlalchemy.orm import Session
+import asyncio
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_
-from typing import List, Optional
-from pydantic import BaseModel
-from models import VMInventory, User
-from database import get_db
-from auth.dependencies import get_current_user, require_engineer
+from sqlalchemy.orm import Session
+
+from database import SessionLocal, get_db
+from middleware.auth import get_current_user, require_roles
+from models import ProxmoxNode, Task, VMInventory, User
+from schemas import (
+    NodeCapacityResponse,
+    ProvisionVDIRequest,
+    ProvisionVMRequest,
+    QueuedTaskResponse,
+    TaskResponse,
+    VMInventoryResponse,
+    VMRegisterRequest,
+    WorkloadUpdate,
+)
+from services.provisioner import provisioner_service
+from services.task_service import task_service
 
 router = APIRouter(tags=["vms"])
 
 
-class VMRegisterRequest(BaseModel):
-    name: str
-    vmid: int
-    proxmox_node: str
-    node_ip: Optional[str] = None
-    ip_address: Optional[str] = None
-    owner_username: Optional[str] = None
-    vm_type: str = "vm"  # "vm" or "vdi"
-    cpu_cores: Optional[int] = None
-    ram_gb: Optional[int] = None
-    disk_gb: Optional[int] = None
-    guac_url: Optional[str] = None
-
-
-class VMSearchResponse(BaseModel):
-    id: str
-    vmid: int
-    name: str
-    proxmox_node: str
-    ip_address: Optional[str]
-    owner_username: Optional[str]
-    vm_type: str
-    status: str
-    cpu_cores: Optional[int]
-    ram_gb: Optional[int]
-    disk_gb: Optional[int]
-    guac_url: Optional[str]
-    
-    class Config:
-        from_attributes = True
-
-
-class VMDetailResponse(VMSearchResponse):
-    node_ip: Optional[str]
-    current_cpu_usage: Optional[float]
-    current_memory_usage: Optional[float]
-    uptime_seconds: Optional[int]
-    last_synced: Optional[str]
-
-
-@router.post("/register", response_model=VMSearchResponse, status_code=status.HTTP_201_CREATED)
-async def register_vm(
-    request: VMRegisterRequest,
+@router.get("", response_model=list[VMInventoryResponse])
+def list_vms(
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=1000),
+    status_filter: str | None = Query(default=None, alias="status"),
+    vm_type: str | None = Query(default=None),
+    proxmox_node: str | None = Query(default=None),
+    owner: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_engineer)
-):
-    """Register a new VM/VDI to inventory"""
-    
-    # Check if VM already exists by vmid
-    existing = db.query(VMInventory).filter(
-        (VMInventory.vmid == request.vmid) &
-        (VMInventory.proxmox_node == request.proxmox_node)
-    ).first()
-    
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"VM with ID {request.vmid} already exists on node {request.proxmox_node}"
-        )
-    
-    from datetime import datetime
-    vm = VMInventory(
-        vmid=request.vmid,
-        name=request.name,
-        proxmox_node=request.proxmox_node,
-        node_ip=request.node_ip,
-        ip_address=request.ip_address,
-        owner_username=request.owner_username,
-        vm_type=request.vm_type,
-        cpu_cores=request.cpu_cores,
-        ram_gb=request.ram_gb,
-        disk_gb=request.disk_gb,
-        guac_url=request.guac_url,
-        status="running",
-        last_synced=datetime.utcnow()
-    )
-    
-    db.add(vm)
-    db.commit()
-    db.refresh(vm)
-    
-    return vm
-
-
-@router.get("/search", response_model=List[VMSearchResponse])
-async def search_vms(
-    q: str = Query(..., min_length=1, description="Search query"),
-    db: Session = Depends(get_db),
-    limit: int = Query(50, ge=1, le=500)
-):
-    """
-    Search VMs by name, IP address, owner, or node.
-    Searches are performed against local DB for instant results.
-    """
-    search_pattern = f"%{q}%"
-    
-    vms = db.query(VMInventory).filter(
-        or_(
-            VMInventory.name.ilike(search_pattern),
-            VMInventory.ip_address.ilike(search_pattern),
-            VMInventory.owner_username.ilike(search_pattern),
-            VMInventory.proxmox_node.ilike(search_pattern)
-        )
-    ).limit(limit).all()
-    
-    return vms
-
-
-@router.get("/", response_model=List[VMSearchResponse])
-async def list_vms(
-    db: Session = Depends(get_db),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=500),
-    status: Optional[str] = Query(None, description="Filter by status (running, stopped)"),
-    vm_type: Optional[str] = Query(None, description="Filter by type (vm, vdi)"),
-    proxmox_node: Optional[str] = Query(None, description="Filter by node"),
-    owner: Optional[str] = Query(None, description="Filter by owner")
-):
-    """List all VMs with optional filters"""
+    _: User = Depends(require_roles({"admin", "team-lead", "engineer", "viewer"})),
+) -> list[VMInventory]:
     query = db.query(VMInventory)
-    
-    if status:
-        query = query.filter(VMInventory.status == status)
+    if status_filter:
+        query = query.filter(VMInventory.status == status_filter)
     if vm_type:
         query = query.filter(VMInventory.vm_type == vm_type)
     if proxmox_node:
         query = query.filter(VMInventory.proxmox_node == proxmox_node)
     if owner:
         query = query.filter(VMInventory.owner_username.ilike(f"%{owner}%"))
-    
-    vms = query.offset(skip).limit(limit).all()
-    
-    return vms
+
+    return query.order_by(VMInventory.last_synced.desc()).offset(skip).limit(limit).all()
 
 
-@router.get("/{vm_id}", response_model=VMDetailResponse)
-async def get_vm_details(
-    vm_id: str,
+@router.get("/search", response_model=list[VMInventoryResponse])
+def search_vms(
+    q: str = Query(..., min_length=1),
+    limit: int = Query(default=100, ge=1, le=1000),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """Get detailed information about a specific VM"""
-    vm = db.query(VMInventory).filter(VMInventory.id == vm_id).first()
-    
-    if not vm:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="VM not found"
+    _: User = Depends(require_roles({"admin", "team-lead", "engineer", "viewer"})),
+) -> list[VMInventory]:
+    pattern = f"%{q}%"
+    return (
+        db.query(VMInventory)
+        .filter(
+            or_(
+                VMInventory.name.ilike(pattern),
+                VMInventory.ip_address.ilike(pattern),
+                VMInventory.owner_username.ilike(pattern),
+                VMInventory.proxmox_node.ilike(pattern),
+            )
         )
-    
+        .order_by(VMInventory.last_synced.desc())
+        .limit(limit)
+        .all()
+    )
+
+
+@router.post("/register", response_model=VMInventoryResponse, status_code=status.HTTP_201_CREATED)
+def register_vm(
+    payload: VMRegisterRequest,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles({"admin", "team-lead", "engineer"})),
+) -> VMInventory:
+    existing = (
+        db.query(VMInventory)
+        .filter(VMInventory.vmid == payload.vmid, VMInventory.proxmox_node == payload.proxmox_node)
+        .first()
+    )
+    if existing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="VM already registered on this node")
+
+    vm = VMInventory(**payload.model_dump())
+    db.add(vm)
+    db.commit()
+    db.refresh(vm)
     return vm
 
 
+@router.get("/nodes", response_model=list[NodeCapacityResponse])
+def list_nodes(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles({"admin", "team-lead", "engineer", "viewer"})),
+) -> list[ProxmoxNode]:
+    return db.query(ProxmoxNode).order_by(ProxmoxNode.name.asc()).all()
+
+
 @router.get("/nodes/capacity")
-async def get_nodes_capacity(
-    db: Session = Depends(get_db)
-):
-    """Get capacity information for all Proxmox nodes"""
-    from sqlalchemy import func
-    
-    nodes = db.query(
-        VMInventory.proxmox_node,
-        func.count(VMInventory.id).label("vm_count"),
-        func.sum(VMInventory.cpu_cores).label("total_cpu"),
-        func.sum(VMInventory.ram_gb).label("total_ram"),
-        func.sum(VMInventory.disk_gb).label("total_disk")
-    ).group_by(VMInventory.proxmox_node).all()
-    
+def nodes_capacity(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles({"admin", "team-lead", "engineer", "viewer"})),
+) -> list[dict]:
+    rows = db.query(ProxmoxNode).order_by(ProxmoxNode.name.asc()).all()
     return [
         {
-            "node": node.proxmox_node,
-            "vm_count": node.vm_count or 0,
+            "node": node.name,
+            "vm_count": db.query(VMInventory).filter(VMInventory.proxmox_node == node.name).count(),
             "total_cpu": node.total_cpu or 0,
-            "total_ram": node.total_ram or 0,
-            "total_disk": node.total_disk or 0
+            "total_ram": node.total_ram_gb or 0,
+            "total_disk": node.total_disk_gb or 0,
+            "free_cpu": node.free_cpu,
+            "free_ram": node.free_ram_gb,
+            "free_disk": node.free_disk_gb,
+            "last_synced": node.last_synced.isoformat() if node.last_synced else None,
         }
-        for node in nodes
+        for node in rows
     ]
+
+
+@router.get("/{vm_id}", response_model=VMInventoryResponse)
+def get_vm(
+    vm_id: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles({"admin", "team-lead", "engineer", "viewer"})),
+) -> VMInventory:
+    vm = db.query(VMInventory).filter(VMInventory.id == vm_id).first()
+    if not vm:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VM not found")
+    return vm
+
+@router.put("/{vm_id}", response_model=VMInventoryResponse)
+def update_vm(
+    vm_id: str,
+    payload: WorkloadUpdate,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_roles({"admin", "team-lead"})),
+) -> VMInventory:
+    vm = db.query(VMInventory).filter(VMInventory.id == vm_id).first()
+    if not vm:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VM not found")
+    
+    if payload.name is not None:
+        vm.name = payload.name
+    if payload.owner_username is not None:
+        vm.owner_username = payload.owner_username
+    if payload.ip_address is not None:
+        vm.ip_address = payload.ip_address
+    if payload.status is not None:
+        vm.status = payload.status
+    
+    db.commit()
+    db.refresh(vm)
+    return vm
+
+@router.delete("/{vm_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_vm(
+    vm_id: str,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_roles({"admin"})),
+):
+    vm = db.query(VMInventory).filter(VMInventory.id == vm_id).first()
+    if not vm:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VM not found")
+    
+    db.delete(vm)
+    db.commit()
+    return None
+
+
+async def _run_vm_provision(task_id: str, payload: ProvisionVMRequest, actor_id: str) -> None:
+    db = SessionLocal()
+    try:
+        task = db.query(Task).filter(Task.id == task_id).first()
+        actor = db.query(User).filter(User.id == actor_id).first()
+        if not task or not actor:
+            return
+        await provisioner_service.provision_vm(db, task, payload, actor)
+    except Exception as exc:
+        task = db.query(Task).filter(Task.id == task_id).first()
+        if task:
+            await task_service.mark_failed(db, task, str(exc))
+    finally:
+        db.close()
+
+
+async def _run_vdi_provision(task_id: str, payload: ProvisionVDIRequest, actor_id: str) -> None:
+    db = SessionLocal()
+    try:
+        task = db.query(Task).filter(Task.id == task_id).first()
+        actor = db.query(User).filter(User.id == actor_id).first()
+        if not task or not actor:
+            return
+        await provisioner_service.provision_vdi(db, task, payload, actor)
+    except Exception as exc:
+        task = db.query(Task).filter(Task.id == task_id).first()
+        if task:
+            await task_service.mark_failed(db, task, str(exc))
+    finally:
+        db.close()
+
+
+@router.post("/provision/vm", response_model=QueuedTaskResponse, status_code=status.HTTP_202_ACCEPTED)
+async def provision_vm(
+    payload: ProvisionVMRequest,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_roles({"admin", "team-lead", "engineer"})),
+) -> QueuedTaskResponse:
+    task = task_service.create_task(
+        db,
+        user_id=actor.id,
+        task_type="provision_vm",
+        target_name=payload.name,
+        metadata_json=payload.model_dump(),
+    )
+    asyncio.create_task(_run_vm_provision(task.id, payload, actor.id))
+    return QueuedTaskResponse(
+        task_id=task.id,
+        status=task.status,
+        message="VM provisioning queued",
+        target_name=payload.name,
+    )
+
+
+@router.post("/provision/vdi", response_model=QueuedTaskResponse, status_code=status.HTTP_202_ACCEPTED)
+async def provision_vdi(
+    payload: ProvisionVDIRequest,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_roles({"admin", "team-lead", "engineer"})),
+) -> QueuedTaskResponse:
+    task = task_service.create_task(
+        db,
+        user_id=actor.id,
+        task_type="provision_vdi",
+        target_name=payload.name,
+        metadata_json=payload.model_dump(),
+    )
+    asyncio.create_task(_run_vdi_provision(task.id, payload, actor.id))
+    return QueuedTaskResponse(
+        task_id=task.id,
+        status=task.status,
+        message="VDI provisioning queued",
+        target_name=payload.name,
+    )
+
+
+@router.get("/tasks/{task_id}", response_model=TaskResponse)
+def get_task_status(
+    task_id: str,
+    db: Session = Depends(get_db),
+    actor: User = Depends(get_current_user),
+) -> Task:
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+
+    if actor.role not in {"admin", "team-lead"} and task.user_id != actor.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed to view this task")
+
+    return task

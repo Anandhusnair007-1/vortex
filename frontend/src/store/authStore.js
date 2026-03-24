@@ -8,31 +8,38 @@ export const useAuthStore = create((set, get) => ({
   error: null,
 
   setTokens: (accessToken, refreshToken) => {
-    localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
+    if (accessToken) {
+      localStorage.setItem('accessToken', accessToken);
+    } else {
+      localStorage.removeItem('accessToken');
+    }
+
+    if (refreshToken) {
+      localStorage.setItem('refreshToken', refreshToken);
+    } else {
+      localStorage.removeItem('refreshToken');
+    }
+
     set({ accessToken, refreshToken });
   },
 
   setUser: (user) => set({ user }),
-
   setLoading: (isLoading) => set({ isLoading }),
-
   setError: (error) => set({ error }),
 
   logout: () => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
-    set({ user: null, accessToken: null, refreshToken: null });
+    set({ user: null, accessToken: null, refreshToken: null, error: null });
   },
 
   isAuthenticated: () => {
-    const { accessToken } = get();
-    return !!accessToken;
+    const { accessToken, user } = get();
+    return Boolean(accessToken && user);
   },
 
   hasRole: (roles) => {
     const { user } = get();
-    if (!user) return false;
-    return roles.includes(user.role);
+    return Boolean(user && roles.includes(user.role));
   },
 }));

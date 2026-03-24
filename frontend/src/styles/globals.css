@@ -2,71 +2,149 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --vortyx-bg: #060c1a;
+  --vortyx-bg-elev: #0b1324;
+  --vortyx-bg-card: #0f172a;
+  --vortyx-border: rgba(255, 255, 255, 0.06);
+  --vortyx-nav: rgba(15, 23, 42, 0.72);
+  --vortyx-accent: #3b82f6;
+  --vortyx-accent-strong: #2563eb;
+  --vortyx-success: #22c55e;
+  --vortyx-warning: #f59e0b;
+  --vortyx-danger: #ef4444;
+  --vortyx-text-primary: #f3f7ff;
+  --vortyx-text-secondary: #9fb0d0;
+  --vortyx-text-muted: #6e7c99;
+}
+
 * {
-  @apply transition-colors duration-200;
+  box-sizing: border-box;
 }
 
 body {
-  @apply bg-slate-50 text-slate-900;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 14% -8%, rgba(59, 130, 246, 0.18), transparent 42%),
+    radial-gradient(circle at 82% 10%, rgba(37, 99, 235, 0.12), transparent 32%),
+    var(--vortyx-bg);
+  color: var(--vortyx-text-primary);
+  font-family: 'Manrope', 'Space Grotesk', 'Segoe UI', sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 ::-webkit-scrollbar {
-  @apply w-2;
+  width: 10px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-slate-100;
+  background: rgba(255, 255, 255, 0.02);
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-slate-300 rounded-full hover:bg-slate-400;
+  border-radius: 9999px;
+  background: rgba(159, 176, 208, 0.32);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(159, 176, 208, 0.5);
 }
 
 @layer components {
-  .btn {
-    @apply px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+  .vortyx-noise {
+    @apply pointer-events-none fixed inset-0 z-0 opacity-[0.12];
+    background-image: radial-gradient(rgba(255, 255, 255, 0.03) 0.5px, transparent 0.5px);
+    background-size: 2.5px 2.5px;
   }
 
-  .btn-primary {
-    @apply btn bg-slate-900 text-white hover:bg-slate-800;
+  .vortyx-panel {
+    @apply rounded-2xl border border-white/10 bg-[rgba(15,23,42,0.9)] shadow-[0_22px_48px_rgba(0,0,0,0.34)] backdrop-blur-xl transition-all duration-300;
   }
 
-  .btn-secondary {
-    @apply btn bg-slate-200 text-slate-900 hover:bg-slate-300;
+  .vortyx-panel:hover {
+    border-color: rgba(59, 130, 246, 0.26);
+    box-shadow: 0 24px 56px rgba(0, 0, 0, 0.38), 0 0 0 1px rgba(59, 130, 246, 0.16);
   }
 
-  .btn-sm {
-    @apply px-2 py-1 text-sm;
+  .vortyx-elevated {
+    @apply rounded-2xl border border-white/10 bg-[rgba(15,23,42,0.96)] shadow-[0_26px_58px_rgba(0,0,0,0.4)] backdrop-blur-xl;
   }
 
-  .card {
-    @apply bg-white rounded-lg shadow p-4 border border-slate-200;
+  .vortyx-btn-primary {
+    @apply inline-flex items-center justify-center rounded-xl border border-transparent px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(79,140,255,0.35)] transition-all duration-300 hover:-translate-y-0.5;
+    background: linear-gradient(135deg, var(--vortyx-accent), var(--vortyx-accent-strong));
   }
 
-  .input {
-    @apply w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent;
+  .vortyx-btn-ghost {
+    @apply inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/[0.03] px-4 py-2 text-sm font-medium text-vortyx-text-secondary transition-all duration-300 hover:border-white/25 hover:bg-white/[0.06] hover:text-vortyx-text-primary;
   }
 
-  .badge {
-    @apply inline-block px-2 py-1 text-xs font-semibold rounded-full;
+  .vortyx-input {
+    @apply h-11 w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 text-sm text-vortyx-text-primary placeholder:text-vortyx-text-muted focus:outline-none;
   }
 
-  .alert-badge {
-    @apply badge;
+  .vortyx-input:focus {
+    border-color: rgba(79, 140, 255, 0.6);
+    box-shadow: 0 0 0 4px rgba(79, 140, 255, 0.16);
   }
 
-  .severity-critical {
-    @apply bg-red-100 text-red-800;
+  select.vortyx-input {
+    color-scheme: dark;
+    background-color: rgba(255, 255, 255, 0.03);
+    color: var(--vortyx-text-primary);
   }
 
-  .severity-warning {
-    @apply bg-amber-100 text-amber-800;
+  select.vortyx-input option,
+  select.vortyx-input optgroup {
+    background-color: var(--vortyx-bg-card);
+    color: var(--vortyx-text-primary);
   }
 
-  .severity-info {
-    @apply bg-blue-100 text-blue-800;
+  .vortyx-kicker {
+    @apply text-xs font-semibold uppercase tracking-[0.18em] text-vortyx-text-muted;
+  }
+}
+
+@layer utilities {
+  .bg-vortyx-bg {
+    background-color: var(--vortyx-bg);
+  }
+
+  .bg-vortyx-nav {
+    background-color: var(--vortyx-nav);
+  }
+
+  .text-vortyx-text-primary {
+    color: var(--vortyx-text-primary);
+  }
+
+  .text-vortyx-text-secondary {
+    color: var(--vortyx-text-secondary);
+  }
+
+  .text-vortyx-text-muted {
+    color: var(--vortyx-text-muted);
+  }
+
+  .text-vortyx-accent {
+    color: var(--vortyx-accent);
+  }
+
+  .text-vortyx-success {
+    color: var(--vortyx-success);
+  }
+
+  .text-vortyx-warning {
+    color: var(--vortyx-warning);
+  }
+
+  .text-vortyx-danger {
+    color: var(--vortyx-danger);
+  }
+
+  .bg-vortyx-accent {
+    background-color: var(--vortyx-accent);
   }
 }

@@ -1,184 +1,140 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
-from typing import List, Optional
-from pydantic import BaseModel
-from models import RFIDDevice, RFIDAccess, User
+
 from database import get_db
-from auth.dependencies import require_engineer, require_admin
+from middleware.auth import require_roles
+from models import RFIDAccess, User
+from schemas import (
+    RFIDAccessBulkRequest,
+    RFIDAccessResponse,
+    RFIDAuditEntry,
+    RFIDDeviceActionResponse,
+    RFIDDeviceCreateRequest,
+    RFIDDeviceDetailResponse,
+    RFIDDeviceResponse,
+    RFIDDeviceUpdateRequest,
+)
+from services.rfid_service import rfid_service
 
 router = APIRouter(tags=["rfid"])
 
 
-class RFIDDeviceRequest(BaseModel):
-    name: str
-    ip: str
-    door_name: str
-    location: str
-    brand: str = "generic_http"
-    credentials: Optional[dict] = None
+@router.get("/devices", response_model=list[RFIDDeviceResponse])
+def list_devices(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles({"admin", "team-lead", "engineer", "viewer"})),
+) -> list:
+    return rfid_service.list_devices(db)
 
 
-class RFIDDeviceResponse(BaseModel):
-    id: str
-    name: str
-    ip: str
-    door_name: str
-    location: str
-    brand: str
-    is_online: bool
-    
-    class Config:
-        from_attributes = True
-
-
-class RFIDAccessRequest(BaseModel):
-    user_id: str
-    device_ids: List[str]
-
-
-class RFIDAccessResponse(BaseModel):
-    id: str
-    user_id: str
-    device_id: str
-    granted_at: str
-    is_active: bool
-    
-    class Config:
-        from_attributes = True
-
-
-@router.get("/devices", response_model=List[RFIDDeviceResponse])
-async def list_devices(db: Session = Depends(get_db)):
-    """List all RFID devices"""
-    devices = db.query(RFIDDevice).all()
-    return devices
+@router.get("/devices/{device_id}", response_model=RFIDDeviceDetailResponse)
+def get_device_detail(
+    device_id: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles({"admin", "team-lead", "engineer", "viewer"})),
+) -> RFIDDeviceDetailResponse:
+    return rfid_service.get_device_detail(db, device_id)
 
 
 @router.post("/devices", response_model=RFIDDeviceResponse, status_code=status.HTTP_201_CREATED)
-async def create_device(
-    request: RFIDDeviceRequest,
+def create_device(
+    payload: RFIDDeviceCreateRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_roles({"admin", "team-lead"})),
 ):
-    """Create a new RFID device (admin only)"""
-    device = RFIDDevice(
-        name=request.name,
-        ip=request.ip,
-        door_name=request.door_name,
-        location=request.location,
-        brand=request.brand,
-        credentials=request.credentials
-    )
-    
-    db.add(device)
-    db.commit()
-    db.refresh(device)
-    
-    return device
+    return rfid_service.create_device(db, payload, current_user)
 
 
-@router.get("/users/{user_id}/access", response_model=List[RFIDAccessResponse])
-async def get_user_access(
+@router.put("/devices/{device_id}", response_model=RFIDDeviceResponse)
+def update_device(
+    device_id: str,
+    payload: RFIDDeviceUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles({"admin", "team-lead"})),
+):
+    return rfid_service.update_device(db, device_id, payload, current_user)
+
+
+@router.post("/devices/{device_id}/check", response_model=RFIDDeviceActionResponse)
+def check_device(
+    device_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles({"admin", "team-lead", "engineer"})),
+) -> dict:
+    return rfid_service.check_device(db, device_id, current_user)
+
+
+@router.post("/devices/{device_id}/refresh-session", response_model=RFIDDeviceActionResponse)
+def refresh_session(
+    device_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles({"admin", "team-lead", "engineer"})),
+) -> dict:
+    return rfid_service.refresh_device_session(db, device_id, current_user)
+
+
+@router.get("/devices/{device_id}/audit", response_model=list[RFIDAuditEntry])
+def get_device_audit(
+    device_id: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles({"admin", "team-lead", "engineer", "viewer"})),
+    limit: int = Query(default=100, ge=1, le=1000),
+) -> list[dict]:
+    return rfid_service.get_device_audit(db, device_id, limit)
+
+
+@router.get("/users/{user_id}/access", response_model=list[RFIDAccessResponse])
+def get_user_access(
     user_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_engineer)
-):
-    """Get all doors a user has access to"""
-    access_records = db.query(RFIDAccess).filter(
-        (RFIDAccess.user_id == user_id) &
-        (RFIDAccess.is_active == True)
-    ).all()
-    
-    return access_records
-
-
-@router.post("/grant", response_model=RFIDAccessResponse)
-async def grant_access(
-    request: RFIDAccessRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_engineer)
-):
-    """Grant a user access to RFID devices"""
-    
-    user = db.query(User).filter(User.id == request.user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
-    # Grant access to first device for now (will expand)
-    if not request.device_ids:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="At least one device ID is required"
-        )
-    
-    device_id = request.device_ids[0]
-    device = db.query(RFIDDevice).filter(RFIDDevice.id == device_id).first()
-    
-    if not device:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Device not found"
-        )
-    
-    # Check if access already exists
-    existing = db.query(RFIDAccess).filter(
-        (RFIDAccess.user_id == request.user_id) &
-        (RFIDAccess.device_id == device_id)
-    ).first()
-    
-    if existing and existing.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User already has access to this device"
-        )
-    
-    access = RFIDAccess(
-        user_id=request.user_id,
-        device_id=device_id,
-        granted_by=current_user.id,
-        is_active=True
+    _: User = Depends(require_roles({"admin", "team-lead", "engineer"})),
+) -> list[RFIDAccess]:
+    return (
+        db.query(RFIDAccess)
+        .filter(RFIDAccess.user_id == user_id, RFIDAccess.is_active.is_(True))
+        .order_by(RFIDAccess.granted_at.desc())
+        .all()
     )
-    
-    db.add(access)
-    db.commit()
-    db.refresh(access)
-    
-    return access
 
 
-@router.post("/revoke")
-async def revoke_access(
-    request: RFIDAccessRequest,
+@router.post("/access/grant", response_model=list[RFIDAccessResponse])
+@router.post("/grant", response_model=list[RFIDAccessResponse], include_in_schema=False)
+def grant_access(
+    payload: RFIDAccessBulkRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_engineer)
-):
-    """Revoke a user's access to RFID devices"""
-    
-    for device_id in request.device_ids:
-        access = db.query(RFIDAccess).filter(
-            (RFIDAccess.user_id == request.user_id) &
-            (RFIDAccess.device_id == device_id)
-        ).first()
-        
-        if access:
-            access.is_active = False
-            access.revoked_at = __import__('datetime').datetime.utcnow()
-            db.add(access)
-    
-    db.commit()
-    
-    return {"message": "Access revoked successfully"}
+    current_user: User = Depends(require_roles({"admin", "team-lead", "engineer"})),
+) -> list[RFIDAccess]:
+    return rfid_service.grant_access(db, payload, current_user)
 
 
-@router.get("/audit")
-async def get_audit_log(
+@router.post("/access/revoke", response_model=list[RFIDAccessResponse])
+@router.post("/revoke", response_model=list[RFIDAccessResponse], include_in_schema=False)
+def revoke_access(
+    payload: RFIDAccessBulkRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_engineer),
-    limit: int = 100
+    current_user: User = Depends(require_roles({"admin", "team-lead", "engineer"})),
+) -> list[RFIDAccess]:
+    return rfid_service.revoke_access(db, payload, current_user)
+
+
+@router.get("/audit", response_model=list[RFIDAuditEntry])
+def get_audit_log(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles({"admin", "team-lead", "engineer", "viewer"})),
+    limit: int = Query(default=100, ge=1, le=1000),
+) -> list[dict]:
+    devices = rfid_service.list_devices(db)
+    results: list[dict] = []
+    for device in devices:
+        results.extend(rfid_service.get_device_audit(db, device.id, limit))
+    results.sort(key=lambda row: row["timestamp"], reverse=True)
+    return results[:limit]
+
+
+@router.delete("/devices/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_device(
+    device_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles({"admin", "team-lead"})),
 ):
-    """Get RFID audit log"""
-    logs = db.query(RFIDAccess).order_by(RFIDAccess.granted_at.desc()).limit(limit).all()
-    return logs
+    return rfid_service.delete_device(db, device_id, current_user)

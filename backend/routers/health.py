@@ -26,11 +26,15 @@ def health() -> HealthResponse:
     finally:
         db.close()
 
+    redis_client = None
     try:
         redis_client = Redis.from_url(settings.redis_url, decode_responses=True)
         redis_client.ping()
     except Exception:
         redis_status = "down"
+    finally:
+        if redis_client is not None:
+            redis_client.close()
 
     overall_status = "healthy" if db_status == "up" and redis_status == "up" else "degraded"
 
@@ -38,7 +42,7 @@ def health() -> HealthResponse:
         status=overall_status,
         app=settings.app_name,
         environment=settings.app_env,
-        version="1.0.0",
+        version=settings.app_version,
         timestamp=datetime.now(timezone.utc),
         database=db_status,
         redis=redis_status,

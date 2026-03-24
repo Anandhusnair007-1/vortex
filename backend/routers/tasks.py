@@ -1,200 +1,149 @@
-from fastapi import APIRouter, HTTPException, status, Depends, Query
-from sqlalchemy.orm import Session
-from typing import List, Optional
-from pydantic import BaseModel
 from datetime import datetime
-from models import Task, User
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
+
 from database import get_db
-from auth.dependencies import get_current_user, require_engineer
+from middleware.auth import get_current_user, require_roles
+from models import ActivityLog, Task, User
+from schemas import TaskCreateRequest, TaskResponse, TaskUpdateRequest
 
 router = APIRouter(tags=["tasks"])
 
 
-class TaskCreateRequest(BaseModel):
-    title: str
-    description: Optional[str] = None
-    priority: str = "medium"  # low, medium, high, critical
-    task_type: Optional[str] = None
-    target_id: Optional[str] = None
-
-
-class TaskUpdateRequest(BaseModel):
-    status: Optional[str] = None  # pending, in_progress, completed, failed
-    result: Optional[dict] = None
-
-
-class TaskResponse(BaseModel):
-    id: str
-    title: str
-    description: Optional[str]
-    assigned_to: str
-    status: str
-    priority: str
-    task_type: Optional[str]
-    created_at: datetime
-    started_at: Optional[datetime]
-    completed_at: Optional[datetime]
-    
-    class Config:
-        from_attributes = True
-
-
-@router.post("/", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
-async def create_task(
-    request: TaskCreateRequest,
+@router.post("", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
+def create_task(
+    payload: TaskCreateRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_engineer)
-):
-    """Create a new task"""
+    actor: User = Depends(require_roles({"admin", "team-lead", "engineer"})),
+) -> Task:
     task = Task(
-        title=request.title,
-        description=request.description,
-        assigned_to=current_user.id,
-        priority=request.priority,
-        task_type=request.task_type,
-        target_id=request.target_id,
-        status="pending"
+        user_id=actor.id,
+        task_type=payload.task_type,
+        status="pending",
+        target_name=payload.target_name,
+        started_at=datetime.utcnow(),
+        metadata_json=payload.metadata_json or {},
     )
-    
     db.add(task)
+    db.add(
+        ActivityLog(
+            user_id=actor.id,
+            action="task_create",
+            target=payload.target_name,
+            detail=f"Created task {payload.task_type}",
+            points_earned=0,
+        )
+    )
     db.commit()
     db.refresh(task)
-    
     return task
 
 
-@router.get("/", response_model=List[TaskResponse])
-async def list_tasks(
+@router.get("", response_model=list[TaskResponse])
+def list_tasks(
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=200),
+    status_filter: str | None = Query(default=None, alias="status"),
+    assigned_to: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    status: Optional[str] = Query(None),
-    assigned_to: Optional[str] = Query(None),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=500)
-):
-    """List tasks"""
+    actor: User = Depends(get_current_user),
+) -> list[Task]:
     query = db.query(Task)
-    
-    # If not admin/team-lead, only show own tasks
-    if current_user.role not in ["admin", "team-lead"]:
-        query = query.filter(Task.assigned_to == current_user.id)
-    elif assigned_to:
-        query = query.filter(Task.assigned_to == assigned_to)
-    
-    if status:
-        query = query.filter(Task.status == status)
-    
-    tasks = query.order_by(Task.created_at.desc()).offset(skip).limit(limit).all()
-    
-    return tasks
+
+    if actor.role in {"admin", "team-lead"}:
+        if assigned_to:
+            query = query.filter(Task.user_id == assigned_to)
+    else:
+        query = query.filter(Task.user_id == actor.id)
+
+    if status_filter:
+        query = query.filter(Task.status == status_filter)
+
+    return query.order_by(Task.started_at.desc()).offset(skip).limit(limit).all()
 
 
-@router.get("/my-tasks", response_model=List[TaskResponse])
-async def get_my_tasks(
+@router.get("/my-tasks", response_model=list[TaskResponse])
+def get_my_tasks(
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=200),
+    status_filter: str | None = Query(default=None, alias="status"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    status: Optional[str] = Query(None),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100)
-):
-    """Get current user's tasks"""
-    query = db.query(Task).filter(Task.assigned_to == current_user.id)
-    
-    if status:
-        query = query.filter(Task.status == status)
-    
-    tasks = query.order_by(Task.created_at.desc()).offset(skip).limit(limit).all()
-    
-    return tasks
+    actor: User = Depends(get_current_user),
+) -> list[Task]:
+    query = db.query(Task).filter(Task.user_id == actor.id)
+    if status_filter:
+        query = query.filter(Task.status == status_filter)
+    return query.order_by(Task.started_at.desc()).offset(skip).limit(limit).all()
 
 
 @router.get("/{task_id}", response_model=TaskResponse)
-async def get_task(
-    task_id: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """Get a specific task"""
+def get_task(task_id: str, db: Session = Depends(get_db), actor: User = Depends(get_current_user)) -> Task:
     task = db.query(Task).filter(Task.id == task_id).first()
-    
     if not task:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Task not found"
-        )
-    
-    # Check authorization
-    if current_user.id != task.assigned_to and current_user.role not in ["admin", "team-lead"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to view this task"
-        )
-    
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+
+    if actor.role not in {"admin", "team-lead"} and task.user_id != actor.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed to view this task")
+
     return task
 
 
 @router.put("/{task_id}", response_model=TaskResponse)
-async def update_task(
+def update_task(
     task_id: str,
-    request: TaskUpdateRequest,
+    payload: TaskUpdateRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_engineer)
-):
-    """Update a task"""
+    actor: User = Depends(require_roles({"admin", "team-lead", "engineer"})),
+) -> Task:
     task = db.query(Task).filter(Task.id == task_id).first()
-    
     if not task:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Task not found"
-        )
-    
-    # Only assigned user or admin can update
-    if current_user.id != task.assigned_to and current_user.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to update this task"
-        )
-    
-    if request.status:
-        old_status = task.status
-        task.status = request.status
-        
-        # Set timestamps
-        if old_status == "pending" and request.status == "in_progress":
-            task.started_at = datetime.utcnow()
-        elif request.status in ["completed", "failed"]:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+
+    if actor.role not in {"admin", "team-lead"} and task.user_id != actor.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed to update this task")
+
+    if payload.status is not None:
+        task.status = payload.status
+        if payload.status == "completed" and task.completed_at is None:
             task.completed_at = datetime.utcnow()
-    
-    if request.result:
-        task.result = request.result
-    
+        if payload.status == "failed" and task.completed_at is None:
+            task.completed_at = datetime.utcnow()
+
+    if payload.error_message is not None:
+        task.error_message = payload.error_message
+    if payload.metadata_json is not None:
+        task.metadata_json = payload.metadata_json
+
+    db.add(
+        ActivityLog(
+            user_id=actor.id,
+            action="task_update",
+            target=task.target_name or task.id,
+            detail=f"Task status set to {task.status}",
+            points_earned=0,
+        )
+    )
     db.commit()
     db.refresh(task)
-    
     return task
 
 
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_task(
+def delete_task(
     task_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_engineer)
-):
-    """Delete a task (only pending tasks)"""
+    actor: User = Depends(require_roles({"admin", "team-lead", "engineer"})),
+) -> None:
     task = db.query(Task).filter(Task.id == task_id).first()
-    
     if not task:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Task not found"
-        )
-    
-    if task.status != "pending":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Can only delete pending tasks"
-        )
-    
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+
+    if actor.role not in {"admin", "team-lead"} and task.user_id != actor.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed to delete this task")
+
+    if task.status not in {"pending", "failed", "completed"}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Can only delete finalized tasks")
+
     db.delete(task)
     db.commit()

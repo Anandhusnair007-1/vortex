@@ -1,43 +1,59 @@
-import os
-import asyncio
 from datetime import datetime
-from sqlalchemy.orm import Session
-from proxmoxer import ProxmoxAPI
+
 from apscheduler.schedulers.background import BackgroundScheduler
 import logging
-from models import VMInventory
+from sqlalchemy.orm import Session
+
+from config import get_settings
 from database import SessionLocal
+from models import VMInventory, ProxmoxNode
+
+try:
+    from proxmoxer import ProxmoxAPI
+except ImportError:  # pragma: no cover - optional local dependency
+    ProxmoxAPI = None
 
 logger = logging.getLogger(__name__)
-
-# Proxmox Configuration
-PROXMOX_NODES = os.getenv("PROXMOX_NODES", "node1:192.168.1.10").split(",")
-PROXMOX_USERNAME = os.getenv("PROXMOX_USERNAME", "root@pam")
-PROXMOX_PASSWORD = os.getenv("PROXMOX_PASSWORD", "password")
-PROXMOX_VERIFY_SSL = os.getenv("PROXMOX_VERIFY_SSL", "false").lower() == "true"
 
 scheduler = None
 
 
-def parse_proxmox_nodes():
-    """Parse PROXMOX_NODES environment variable into list of tuples"""
+def parse_proxmox_nodes() -> list[tuple[str, str]]:
+    """Parse configured proxmox nodes into (name, ip) tuples."""
+    settings = get_settings()
     nodes = []
-    for node_str in PROXMOX_NODES:
+    for node_str in settings.proxmox_nodes:
         if ":" in node_str:
             node_name, node_ip = node_str.strip().split(":")
             nodes.append((node_name.strip(), node_ip.strip()))
     return nodes
 
 
-def get_proxmox_connection(node_ip):
+def get_proxmox_connection(node_ip: str):
     """Create a Proxmox API connection"""
+    settings = get_settings()
+    if ProxmoxAPI is None:
+        logger.warning("proxmoxer_not_installed")
+        return None
+
+    if not settings.proxmox_username or not settings.proxmox_password:
+        logger.warning("Proxmox credentials are not configured")
+        return None
+
     try:
+        host = node_ip
+        port = 8006
+        if ':' in node_ip:
+            host, port_str = node_ip.rsplit(':', 1)
+            port = int(port_str)
+
         proxmox = ProxmoxAPI(
-            node_ip,
-            user=PROXMOX_USERNAME,
-            password=PROXMOX_PASSWORD,
-            verify_ssl=PROXMOX_VERIFY_SSL,
-            timeout=10
+            host,
+            user=settings.proxmox_username,
+            password=settings.proxmox_password,
+            verify_ssl=settings.proxmox_verify_ssl,
+            timeout=10,
+            port=port
         )
         return proxmox
     except Exception as e:
@@ -45,17 +61,76 @@ def get_proxmox_connection(node_ip):
         return None
 
 
-def sync_vms_from_node(node_name, node_ip, db: Session):
+def sync_vms_from_node(node_name: str, node_ip: str, db: Session) -> int:
     """Sync all VMs from a single Proxmox node"""
     try:
         proxmox = get_proxmox_connection(node_ip)
         if not proxmox:
             return 0
 
-        # Get all VMs on this node
+        # Get node object from Proxmox
         nodes_obj = proxmox.nodes(node_name)
+
+        # Look up node in DB to get its ID, or create it if missing
+        db_node = db.query(ProxmoxNode).filter(ProxmoxNode.name == node_name).first()
+        if not db_node:
+            logger.info(f"Auto-creating ProxmoxNode entry for {node_name} at {node_ip}")
+            db_node = ProxmoxNode(
+                name=node_name,
+                ip_address=node_ip,
+                cluster_name="Discovered Cluster",
+                is_active=True,
+                last_synced=datetime.utcnow()
+            )
+            db.add(db_node)
+            db.commit()
+            db.refresh(db_node)
+        
+        node_id = db_node.id
+
+        # Fetch Node status/telemetry (Capacity)
+        try:
+            status = nodes_obj.status.get()
+            # Proxmox returns bytes for mem/disk, convert to GB
+            total_ram = status.get("memory", {}).get("total", 0) // (1024**3)
+            free_ram = (status.get("memory", {}).get("total", 0) - status.get("memory", {}).get("used", 0)) // (1024**3)
+            
+            total_disk = status.get("rootfs", {}).get("total", 0) // (1024**3)
+            free_disk = (status.get("rootfs", {}).get("total", 0) - status.get("rootfs", {}).get("used", 0)) // (1024**3)
+            
+            total_cpu = status.get("cpuinfo", {}).get("cpus", 1)
+            
+            db_node.total_ram_gb = total_ram
+            db_node.free_ram_gb = free_ram
+            db_node.total_disk_gb = total_disk
+            db_node.free_disk_gb = free_disk
+            db_node.total_cpu = total_cpu
+            db_node.last_synced = datetime.utcnow()
+            db.add(db_node)
+            db.commit()
+        except Exception as e:
+            logger.error(f"Failed to fetch status for node {node_name}: {str(e)}")
+
+        # Get all VMs on this node
         qemu_list = nodes_obj.qemu.get()  # KVM VMs
         lxc_list = nodes_obj.lxc.get()    # LXC containers
+
+        # Look up node in DB to get its ID, or create it if missing
+        db_node = db.query(ProxmoxNode).filter(ProxmoxNode.name == node_name).first()
+        if not db_node:
+            logger.info(f"Auto-creating ProxmoxNode entry for {node_name} at {node_ip}")
+            db_node = ProxmoxNode(
+                name=node_name,
+                ip_address=node_ip,
+                cluster_name="Discovered Cluster",
+                is_active=True,
+                last_synced=datetime.utcnow()
+            )
+            db.add(db_node)
+            db.commit()
+            db.refresh(db_node)
+        
+        node_id = db_node.id
 
         count = 0
 
@@ -68,10 +143,8 @@ def sync_vms_from_node(node_name, node_ip, db: Session):
             # Get detailed VM info
             try:
                 vm_config = nodes_obj.qemu(vm_id).config.get()
-                vm_status_detail = nodes_obj.qemu(vm_id).status.current.get()
-            except:
+            except Exception:
                 vm_config = {}
-                vm_status_detail = {}
 
             # Parse VM details
             cpu_cores = vm_config.get("cores", 1)
@@ -90,7 +163,7 @@ def sync_vms_from_node(node_name, node_ip, db: Session):
                             if ip_list:
                                 ip_address = ip_list[0].get("ip-address")
                                 break
-            except:
+            except Exception:
                 pass
 
             # Check if VM already exists
@@ -106,6 +179,7 @@ def sync_vms_from_node(node_name, node_ip, db: Session):
                 existing_vm.ram_gb = memory_gb
                 existing_vm.disk_gb = disk_gb
                 existing_vm.ip_address = ip_address or existing_vm.ip_address
+                existing_vm.proxmox_node_id = node_id or existing_vm.proxmox_node_id
                 existing_vm.last_synced = datetime.utcnow()
                 db.add(existing_vm)
             else:
@@ -114,6 +188,7 @@ def sync_vms_from_node(node_name, node_ip, db: Session):
                     vmid=vm_id,
                     name=vm_name,
                     proxmox_node=node_name,
+                    proxmox_node_id=node_id,
                     node_ip=node_ip,
                     ip_address=ip_address,
                     vm_type="vm",
@@ -147,6 +222,7 @@ def sync_vms_from_node(node_name, node_ip, db: Session):
                     vmid=lxc_id,
                     name=lxc_name,
                     proxmox_node=node_name,
+                    proxmox_node_id=node_id,
                     node_ip=node_ip,
                     vm_type="vdi",
                     status=lxc_status,
@@ -166,16 +242,26 @@ def sync_vms_from_node(node_name, node_ip, db: Session):
         return 0
 
 
-def sync_all_vms():
+def sync_all_vms() -> None:
     """Sync VMs from all Proxmox nodes (scheduled task)"""
     db = SessionLocal()
     try:
-        nodes = parse_proxmox_nodes()
+        # 1. Sync auto-discovered nodes from .env
+        env_nodes = parse_proxmox_nodes()
         total_synced = 0
 
-        for node_name, node_ip in nodes:
+        for node_name, node_ip in env_nodes:
             count = sync_vms_from_node(node_name, node_ip, db)
             total_synced += count
+
+        # 2. Sync all active nodes from the database (UI-added nodes)
+        db_nodes = db.query(ProxmoxNode).filter(ProxmoxNode.is_active.is_(True)).all()
+        env_node_names = {n[0] for n in env_nodes}
+        
+        for db_node in db_nodes:
+            if db_node.name not in env_node_names:
+                count = sync_vms_from_node(db_node.name, db_node.ip_address, db)
+                total_synced += count
 
         logger.info(f"✓ VM Sync Complete: {total_synced} VMs synced")
 
@@ -185,7 +271,7 @@ def sync_all_vms():
         db.close()
 
 
-def start_vm_sync_scheduler():
+def start_vm_sync_scheduler() -> None:
     """Start the background VM sync scheduler"""
     global scheduler
 
@@ -205,11 +291,12 @@ def start_vm_sync_scheduler():
         scheduler.start()
         logger.info("✓ VM Sync scheduler started (every 5 minutes)")
 
-        # Run initial sync immediately
-        sync_all_vms()
+        # Run initial sync immediately without blocking fastapi startup
+        import threading
+        threading.Thread(target=sync_all_vms, daemon=True).start()
 
 
-def stop_vm_sync_scheduler():
+def stop_vm_sync_scheduler() -> None:
     """Stop the background VM sync scheduler"""
     global scheduler
 

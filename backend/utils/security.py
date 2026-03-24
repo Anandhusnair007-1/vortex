@@ -1,10 +1,12 @@
 from datetime import datetime, timedelta, timezone
+import json
 from typing import Any
 
+from cryptography.fernet import Fernet
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from config import get_settings
+from config import get_fernet_key, get_settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -49,3 +51,18 @@ def try_decode_token(token: str) -> dict[str, Any] | None:
         return decode_token(token)
     except JWTError:
         return None
+
+
+def encrypt_json(payload: dict[str, Any]) -> str:
+    key = get_fernet_key()
+    fernet = Fernet(key)
+    return fernet.encrypt(json.dumps(payload).encode("utf-8")).decode("utf-8")
+
+
+def decrypt_json(payload: str | None) -> dict[str, Any]:
+    if not payload:
+        return {}
+    key = get_fernet_key()
+    fernet = Fernet(key)
+    raw = fernet.decrypt(payload.encode("utf-8")).decode("utf-8")
+    return json.loads(raw)

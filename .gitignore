@@ -51,3 +51,9 @@ Thumbs.db
 
 # Git
 .git/
+
+# Security & Local Dev
+*.crt
+*.key
+.run/
+

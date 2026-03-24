@@ -33,4 +33,4 @@ def init_db() -> None:
     # Local import avoids circular import during app startup.
     import models  # noqa: F401
 
-    Base.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=engine)  # type: ignore[attr-defined]

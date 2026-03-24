@@ -1,0 +1,150 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --vortyx-bg: #060c1a;
+  --vortyx-bg-elev: #0b1324;
+  --vortyx-bg-card: #0f172a;
+  --vortyx-border: rgba(255, 255, 255, 0.06);
+  --vortyx-nav: rgba(15, 23, 42, 0.72);
+  --vortyx-accent: #3b82f6;
+  --vortyx-accent-strong: #2563eb;
+  --vortyx-success: #22c55e;
+  --vortyx-warning: #f59e0b;
+  --vortyx-danger: #ef4444;
+  --vortyx-text-primary: #f3f7ff;
+  --vortyx-text-secondary: #9fb0d0;
+  --vortyx-text-muted: #6e7c99;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 14% -8%, rgba(59, 130, 246, 0.18), transparent 42%),
+    radial-gradient(circle at 82% 10%, rgba(37, 99, 235, 0.12), transparent 32%),
+    var(--vortyx-bg);
+  color: var(--vortyx-text-primary);
+  font-family: 'Manrope', 'Space Grotesk', 'Segoe UI', sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: rgba(159, 176, 208, 0.32);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(159, 176, 208, 0.5);
+}
+
+@layer components {
+  .vortyx-noise {
+    @apply pointer-events-none fixed inset-0 z-0 opacity-[0.12];
+    background-image: radial-gradient(rgba(255, 255, 255, 0.03) 0.5px, transparent 0.5px);
+    background-size: 2.5px 2.5px;
+  }
+
+  .vortyx-panel {
+    @apply rounded-2xl border border-white/10 bg-[rgba(15,23,42,0.9)] shadow-[0_22px_48px_rgba(0,0,0,0.34)] backdrop-blur-xl transition-all duration-300;
+  }
+
+  .vortyx-panel:hover {
+    border-color: rgba(59, 130, 246, 0.26);
+    box-shadow: 0 24px 56px rgba(0, 0, 0, 0.38), 0 0 0 1px rgba(59, 130, 246, 0.16);
+  }
+
+  .vortyx-elevated {
+    @apply rounded-2xl border border-white/10 bg-[rgba(15,23,42,0.96)] shadow-[0_26px_58px_rgba(0,0,0,0.4)] backdrop-blur-xl;
+  }
+
+  .vortyx-btn-primary {
+    @apply inline-flex items-center justify-center rounded-xl border border-transparent px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(79,140,255,0.35)] transition-all duration-300 hover:-translate-y-0.5;
+    background: linear-gradient(135deg, var(--vortyx-accent), var(--vortyx-accent-strong));
+  }
+
+  .vortyx-btn-ghost {
+    @apply inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/[0.03] px-4 py-2 text-sm font-medium text-vortyx-text-secondary transition-all duration-300 hover:border-white/25 hover:bg-white/[0.06] hover:text-vortyx-text-primary;
+  }
+
+  .vortyx-input {
+    @apply h-11 w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 text-sm text-vortyx-text-primary placeholder:text-vortyx-text-muted focus:outline-none;
+  }
+
+  .vortyx-input:focus {
+    border-color: rgba(79, 140, 255, 0.6);
+    box-shadow: 0 0 0 4px rgba(79, 140, 255, 0.16);
+  }
+
+  select.vortyx-input {
+    color-scheme: dark;
+    background-color: rgba(255, 255, 255, 0.03);
+    color: var(--vortyx-text-primary);
+  }
+
+  select.vortyx-input option,
+  select.vortyx-input optgroup {
+    background-color: var(--vortyx-bg-card);
+    color: var(--vortyx-text-primary);
+  }
+
+  .vortyx-kicker {
+    @apply text-xs font-semibold uppercase tracking-[0.18em] text-vortyx-text-muted;
+  }
+}
+
+@layer utilities {
+  .bg-vortyx-bg {
+    background-color: var(--vortyx-bg);
+  }
+
+  .bg-vortyx-nav {
+    background-color: var(--vortyx-nav);
+  }
+
+  .text-vortyx-text-primary {
+    color: var(--vortyx-text-primary);
+  }
+
+  .text-vortyx-text-secondary {
+    color: var(--vortyx-text-secondary);
+  }
+
+  .text-vortyx-text-muted {
+    color: var(--vortyx-text-muted);
+  }
+
+  .text-vortyx-accent {
+    color: var(--vortyx-accent);
+  }
+
+  .text-vortyx-success {
+    color: var(--vortyx-success);
+  }
+
+  .text-vortyx-warning {
+    color: var(--vortyx-warning);
+  }
+
+  .text-vortyx-danger {
+    color: var(--vortyx-danger);
+  }
+
+  .bg-vortyx-accent {
+    background-color: var(--vortyx-accent);
+  }
+}

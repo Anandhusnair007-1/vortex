@@ -1,0 +1,59 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+/venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+/var/log/
+
+# Build outputs
+/frontend/build/
+/backend/.pytest_cache/
+
+# Docker
+.docker/
+
+# Testing
+.coverage
+htmlcov/
+
+# Database
+pgdata/
+redisdata/
+
+# Temporary files
+*.tmp
+*.temp
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Git
+.git/
+
+# Security & Local Dev
+*.crt
+*.key
+.run/
+

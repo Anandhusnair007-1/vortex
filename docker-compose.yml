@@ -1,0 +1,97 @@
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: vortex_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/ssl:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - vortex_network
+    restart: unless-stopped
+
+  db:
+    image: postgres:15
+    container_name: vortex_db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-vortex}
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secret}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vortex_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: vortex_redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vortex_network
+
+  backend:
+    build: ./backend
+    container_name: vortex_backend
+    expose:
+      - "8000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-vortex_user}:${POSTGRES_PASSWORD:-change_me}@db/${POSTGRES_DB:-vortex}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      DEBUG: ${DEBUG:-false}
+      APP_ENV: ${APP_ENV:-production}
+      PROXMOX_VERIFY_SSL: ${PROXMOX_VERIFY_SSL:-true}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    networks:
+      - vortex_network
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: vortex_frontend
+    expose:
+      - "3000"
+    environment:
+      REACT_APP_API_URL: ${REACT_APP_API_URL}
+      REACT_APP_WS_URL: ${REACT_APP_WS_URL}
+    depends_on:
+      - backend
+    networks:
+      - vortex_network
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+    driver: local
+  redisdata:
+    driver: local
+
+networks:
+  vortex_network:
+    driver: bridge

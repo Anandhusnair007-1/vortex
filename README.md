@@ -1,4 +1,4 @@
-# ITops Platform - Enterprise Cybersecurity Operations Dashboard
+# Vortex Platform - Enterprise Cybersecurity Operations Dashboard
 
 A production-grade cybersecurity operations platform built with FastAPI, React, PostgreSQL, and Redis.
 
@@ -31,7 +31,7 @@ A production-grade cybersecurity operations platform built with FastAPI, React, 
 ### 1. Clone and Setup
 
 ```bash
-cd /home/anandhusnair/projects/ITops
+cd /home/anandhusnair/projects/Vortex
 cp .env.example .env
 ```
 
@@ -76,7 +76,7 @@ from auth.jwt import get_password_hash
 db = SessionLocal()
 admin = User(
     username="admin",
-    email="admin@itops.local",
+    email="admin@vortex.local",
     password_hash=get_password_hash("admin"),
     role="admin"
 )
@@ -100,7 +100,7 @@ Login with:
 ## Project Structure
 
 ```
-ITops/
+Vortex/
 ├── backend/
 │   ├── main.py                 # FastAPI app entry point
 │   ├── database.py             # SQLAlchemy setup
@@ -196,12 +196,12 @@ ITops/
 
 ## Configuring Alerts from Observium
 
-To send alerts from Observium to ITops:
+To send alerts from Observium to Vortex:
 
 1. Go to Observium Settings → Alerts → Alert transports
 2. Create new transport with:
    - **Type**: Webhook
-   - **URL**: `http://itops:8000/api/alerts`
+   - **URL**: `http://vortex:8000/api/alerts`
    - **Method**: POST
 
 3. Configure alert rules to use this transport

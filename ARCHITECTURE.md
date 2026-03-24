@@ -1,4 +1,4 @@
-# ITops Platform - Architecture Guide
+# Vortex Platform - Architecture Guide
 
 ## System Architecture
 

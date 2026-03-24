@@ -1,10 +1,10 @@
-# ITops Platform - Project Completion Summary
+# Vortex Platform - Project Completion Summary
 
 **Project Status**: ✅ **COMPLETE & READY FOR DEPLOYMENT**
 
 ## Executive Summary
 
-ITops (IT Operations) is a **production-ready enterprise cybersecurity operations platform** built with modern, scalable technologies. The complete system has been architected, developed, tested, and documented for immediate deployment.
+Vortex (IT Operations) is a **production-ready enterprise cybersecurity operations platform** built with modern, scalable technologies. The complete system has been architected, developed, tested, and documented for immediate deployment.
 
 **Key Achievement**: Full end-to-end platform from concept to production-ready deployment in one cohesive architecture.
 
@@ -323,7 +323,7 @@ points_config (action-based scoring)
 
 ### Local Development (Current)
 ```bash
-cd /opt/itops
+cd /opt/vortex
 docker-compose up -d
 # Accessible at http://localhost:3000
 ```
@@ -335,7 +335,7 @@ cp .env.example .env && nano .env
 sudo apt update && sudo apt install -y docker.io docker-compose nginx
 
 # Deploy
-sudo mkdir -p /opt/itops && cd /opt/itops
+sudo mkdir -p /opt/vortex && cd /opt/vortex
 sudo git clone ... .
 docker-compose up -d
 
@@ -343,15 +343,15 @@ docker-compose up -d
 docker-compose exec backend python setup_admin.py
 
 # Secure
-sudo certbot certonly --standalone -d cyberops.internal
+sudo certbot certonly --standalone -d vortex.internal
 # Update SSL paths in docker-compose.yml
 
 # Finalize
-sudo systemctl enable itops.service
-sudo systemctl start itops
+sudo systemctl enable vortex.service
+sudo systemctl start vortex
 
 # Access
-# https://cyberops.internal
+# https://vortex.internal
 ```
 
 **Estimated deployment time**: 30-45 minutes
@@ -481,7 +481,7 @@ RFID Adapters:        3 (base + 2 implementations)
 
 ## Conclusion
 
-**ITops is production-ready and ready for immediate deployment.**
+**Vortex is production-ready and ready for immediate deployment.**
 
 The platform has been carefully architected to balance:
 - **Functionality**: All 6 core modules complete

@@ -1,4 +1,4 @@
-# ITops Platform - Operations Runbook
+# Vortex Platform - Operations Runbook
 
 Quick reference guide for common operational tasks.
 
@@ -16,7 +16,7 @@ Quick reference guide for common operational tasks.
 ### Start the Platform
 
 ```bash
-cd /opt/itops
+cd /opt/vortex
 docker-compose up -d
 
 # Verify all services
@@ -24,16 +24,16 @@ docker-compose ps
 
 # Expected output:
 # NAME              COMMAND             STATUS    PORTS
-# itops_db          postgres            Up        5432/tcp
-# itops_redis       redis               Up        6379/tcp
-# itops_backend     uvicorn             Up        0.0.0.0:8000->8000/tcp
-# itops_frontend    serve               Up        0.0.0.0:3000->3000/tcp
+# vortex_db          postgres            Up        5432/tcp
+# vortex_redis       redis               Up        6379/tcp
+# vortex_backend     uvicorn             Up        0.0.0.0:8000->8000/tcp
+# vortex_frontend    serve               Up        0.0.0.0:3000->3000/tcp
 ```
 
 ### Stop the Platform
 
 ```bash
-cd /opt/itops
+cd /opt/vortex
 docker-compose down
 
 # Stop including volumes (full cleanup)
@@ -69,7 +69,7 @@ docker-compose logs -f frontend
 docker-compose logs -f
 
 # Save to file
-docker-compose logs > /tmp/itops_logs.txt
+docker-compose logs > /tmp/vortex_logs.txt
 ```
 
 ---
@@ -81,7 +81,7 @@ docker-compose logs > /tmp/itops_logs.txt
 #### Via API (Recommended)
 
 ```bash
-curl -X POST https://cyberops.internal/api/users/ \
+curl -X POST https://vortex.internal/api/users/ \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -95,7 +95,7 @@ curl -X POST https://cyberops.internal/api/users/ \
 #### Via Python Script
 
 ```bash
-cd /opt/itops
+cd /opt/vortex
 
 docker-compose exec backend python << 'EOF'
 from database import SessionLocal
@@ -201,7 +201,7 @@ EOF
 
 2. **Update .env**
    ```bash
-   nano /opt/itops/.env
+   nano /opt/vortex/.env
    
    # Add to PROXMOX_NODES (comma-separated)
    PROXMOX_NODES=node1:192.168.1.10,node2:192.168.1.11,new_node:192.168.1.12
@@ -229,7 +229,7 @@ EOF
 1. **Create New Adapter Class**
    ```bash
    # Edit backend/services/rfid_adapter.py
-   nano /opt/itops/backend/services/rfid_adapter.py
+   nano /opt/vortex/backend/services/rfid_adapter.py
    ```
 
    Example (add to the file):
@@ -280,7 +280,7 @@ EOF
    - Go to Observium Settings → Alerts → Alert Transports
    - Create new Transport:
      - **Type**: Webhook
-     - **URL**: `https://cyberops.internal/api/alerts`
+     - **URL**: `https://vortex.internal/api/alerts`
      - **Method**: POST
 
 2. **Configure Alert Rule**
@@ -289,7 +289,7 @@ EOF
    - Set Transport to the webhook created above
    - Test alert
 
-3. **Verify in ITops**
+3. **Verify in Vortex**
    - Go to Alerts page
    - Should see incoming alerts with source "observium"
 
@@ -305,7 +305,7 @@ docker-compose logs backend
 
 # Common fixes:
 # 1. Database connection issue
-docker-compose exec db pg_isready -U itops_user
+docker-compose exec db pg_isready -U vortex_user
 
 # 2. Port already in use
 lsof -i :8000
@@ -323,7 +323,7 @@ docker-compose up -d
 docker-compose ps db
 
 # Test connection
-docker-compose exec db psql -U itops_user -c "SELECT version();"
+docker-compose exec db psql -U vortex_user -c "SELECT version();"
 
 # Check connection string in backend logs
 docker-compose logs backend | grep DATABASE_URL
@@ -334,13 +334,13 @@ docker-compose logs backend | grep DATABASE_URL
 ```bash
 # Test WebSocket endpoint
 curl -i -N -H "Connection: Upgrade" -H "Upgrade: websocket" \
-  https://cyberops.internal/ws/alerts
+  https://vortex.internal/ws/alerts
 
 # Check Nginx configuration
 sudo nginx -t
 
 # Verify proxy settings for /ws route
-sudo grep -A 10 "location /ws" /etc/nginx/sites-enabled/itops
+sudo grep -A 10 "location /ws" /etc/nginx/sites-enabled/vortex
 ```
 
 ### High Memory Usage
@@ -350,11 +350,11 @@ sudo grep -A 10 "location /ws" /etc/nginx/sites-enabled/itops
 docker stats
 
 # Check database size
-docker-compose exec db psql -U itops_user -c \
-  "SELECT pg_size_pretty(pg_database_size('itops'));"
+docker-compose exec db psql -U vortex_user -c \
+  "SELECT pg_size_pretty(pg_database_size('vortex'));"
 
 # Vacuum database
-docker-compose exec db psql -U itops_user -d itops -c "VACUUM ANALYZE;"
+docker-compose exec db psql -U vortex_user -d vortex -c "VACUUM ANALYZE;"
 ```
 
 ### Slow Performance
@@ -385,26 +385,26 @@ EOF
 ### Create Full Backup
 
 ```bash
-cd /opt/itops
+cd /opt/vortex
 
 # Manual backup
-docker-compose exec db pg_dump -U itops_user itops | gzip > itops_backup_$(date +%Y%m%d_%H%M%S).sql.gz
+docker-compose exec db pg_dump -U vortex_user vortex | gzip > vortex_backup_$(date +%Y%m%d_%H%M%S).sql.gz
 
 # Or use the backup script
-/opt/itops/backup.sh
+/opt/vortex/backup.sh
 ```
 
 ### Restore from Backup
 
 ```bash
-cd /opt/itops
+cd /opt/vortex
 
 # Stop services
 docker-compose down
 
 # Restore database
-gunzip < itops_backup_20240324_120000.sql.gz | \
-  docker-compose exec -T db psql -U itops_user -d itops
+gunzip < vortex_backup_20240324_120000.sql.gz | \
+  docker-compose exec -T db psql -U vortex_user -d vortex
 
 # Start services
 docker-compose up -d
@@ -417,13 +417,13 @@ docker-compose up -d
 sudo crontab -l
 
 # View backup schedule
-tail -f /var/log/itops_backup.log
+tail -f /var/log/vortex_backup.log
 
 # List backups
-ls -lh /opt/itops/backups/
+ls -lh /opt/vortex/backups/
 
 # View retention policy (edit backup.sh)
-nano /opt/itops/backup.sh
+nano /opt/vortex/backup.sh
 # Default: Keep 7 days of backups
 ```
 
@@ -431,14 +431,14 @@ nano /opt/itops/backup.sh
 
 ```bash
 # Full optimization
-docker-compose exec db psql -U itops_user -d itops << 'EOF'
+docker-compose exec db psql -U vortex_user -d vortex << 'EOF'
 VACUUM FULL;
 ANALYZE;
-REINDEX DATABASE itops;
+REINDEX DATABASE vortex;
 EOF
 
 # Clean old activity logs (keep 90 days)
-docker-compose exec db psql -U itops_user -d itops << 'EOF'
+docker-compose exec db psql -U vortex_user -d vortex << 'EOF'
 DELETE FROM activity_log WHERE timestamp < NOW() - INTERVAL '90 days';
 VACUUM ANALYZE activity_log;
 EOF
@@ -459,20 +459,20 @@ docker-compose exec backend python -c "print('Hello')"
 docker-compose exec backend env
 
 # Check disk usage
-du -sh /opt/itops/*
+du -sh /opt/vortex/*
 
 # Check system resources
 free -h
 df -h
 
 # Restart everything
-cd /opt/itops && docker-compose restart
+cd /opt/vortex && docker-compose restart
 
 # View system logs
-sudo journalctl -u itops.service -f
+sudo journalctl -u vortex.service -f
 
 # Test API endpoint
-curl -k https://cyberops.internal/api/health
+curl -k https://vortex.internal/api/health
 
 # Monitor Docker stats
 docker stats --no-stream
@@ -486,7 +486,7 @@ For issues not covered here:
 
 1. Check logs: `docker-compose logs`
 2. Verify configuration: Review `.env` and `docker-compose.yml`
-3. Test API: `curl https://cyberops.internal/api/health`
+3. Test API: `curl https://vortex.internal/api/health`
 4. Check database: `docker-compose exec db psql...`
 5. Review DEPLOYMENT.md for additional setup details
 

@@ -5,7 +5,7 @@ import os
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://admin:secret@db/itops"
+    "postgresql://admin:secret@db/vortex"
 )
 
 # Create engine with connection pooling

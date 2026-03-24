@@ -3,9 +3,9 @@ version: "3.9"
 services:
   db:
     image: postgres:15
-    container_name: itops_db
+    container_name: vortex_db
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-itops}
+      POSTGRES_DB: ${POSTGRES_DB:-vortex}
       POSTGRES_USER: ${POSTGRES_USER:-admin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secret}
     ports:
@@ -18,11 +18,11 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - itops_network
+      - vortex_network
 
   redis:
     image: redis:7-alpine
-    container_name: itops_redis
+    container_name: vortex_redis
     ports:
       - "${REDIS_PORT:-6379}:6379"
     command: redis-server --appendonly yes
@@ -34,15 +34,15 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - itops_network
+      - vortex_network
 
   backend:
     build: ./backend
-    container_name: itops_backend
+    container_name: vortex_backend
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-secret}@db/${POSTGRES_DB:-itops}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-secret}@db/${POSTGRES_DB:-vortex}
       REDIS_URL: redis://redis:6379
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-secret-key-change-in-production}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
@@ -55,12 +55,12 @@ services:
     volumes:
       - ./backend:/app
     networks:
-      - itops_network
+      - vortex_network
     restart: unless-stopped
 
   frontend:
     build: ./frontend
-    container_name: itops_frontend
+    container_name: vortex_frontend
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     environment:
@@ -72,7 +72,7 @@ services:
     depends_on:
       - backend
     networks:
-      - itops_network
+      - vortex_network
     restart: unless-stopped
 
 volumes:
@@ -82,5 +82,5 @@ volumes:
     driver: local
 
 networks:
-  itops_network:
+  vortex_network:
     driver: bridge

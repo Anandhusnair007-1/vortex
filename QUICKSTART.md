@@ -1,4 +1,4 @@
-# ITops Platform - Quick Start Guide
+# Vortex Platform - Quick Start Guide
 
 Get up and running in 15 minutes.
 
@@ -14,8 +14,8 @@ Get up and running in 15 minutes.
 ### 1. Clone and Navigate
 
 ```bash
-git clone https://github.com/your-company/itops.git /opt/itops
-cd /opt/itops
+git clone https://github.com/your-company/vortex.git /opt/vortex
+cd /opt/vortex
 ```
 
 ### 2. Configure Environment
@@ -25,7 +25,7 @@ cp .env.example .env
 nano .env
 
 # CRITICAL: Update these variables
-DATABASE_URL=postgresql://itops_user:STRONG_PASSWORD@db:5432/itops
+DATABASE_URL=postgresql://vortex_user:STRONG_PASSWORD@db:5432/vortex
 SECRET_KEY=your-super-secret-key-32-characters-min
 PROXMOX_NODES=pve1:192.168.1.10,pve2:192.168.1.11
 PROXMOX_USERNAME=admin@pam
@@ -60,7 +60,7 @@ docker-compose exec backend python setup_admin.py
 Open your browser:
 ```
 http://localhost:3000          # Development
-https://cyberops.internal      # Production (after SSL setup)
+https://vortex.internal      # Production (after SSL setup)
 ```
 
 **Default Credentials:**
@@ -75,15 +75,15 @@ https://cyberops.internal      # Production (after SSL setup)
 
 ```bash
 # Option A: Self-signed (testing)
-cd /opt/itops
+cd /opt/vortex
 mkdir -p ssl
 openssl req -x509 -newkey rsa:4096 -keyout ssl/private.key \
   -out ssl/certificate.crt -days 365 -nodes \
-  -subj "/CN=cyberops.internal"
+  -subj "/CN=vortex.internal"
 
 # Option B: Let's Encrypt (production)
-sudo certbot certonly --standalone -d cyberops.internal
-# Copy certs to /opt/itops/ssl/
+sudo certbot certonly --standalone -d vortex.internal
+# Copy certs to /opt/vortex/ssl/
 
 # Update docker-compose.yml volumes for nginx service
 # - ./ssl:/etc/nginx/ssl:ro
@@ -93,19 +93,19 @@ sudo certbot certonly --standalone -d cyberops.internal
 
 ```bash
 # Create Nginx config
-sudo tee /etc/nginx/sites-enabled/itops > /dev/null << 'EOF'
+sudo tee /etc/nginx/sites-enabled/vortex > /dev/null << 'EOF'
 server {
     listen 80;
-    server_name cyberops.internal;
+    server_name vortex.internal;
     return 301 https://$server_name$request_uri;
 }
 
 server {
     listen 443 ssl;
-    server_name cyberops.internal;
+    server_name vortex.internal;
     
-    ssl_certificate /opt/itops/ssl/certificate.crt;
-    ssl_certificate_key /opt/itops/ssl/private.key;
+    ssl_certificate /opt/vortex/ssl/certificate.crt;
+    ssl_certificate_key /opt/vortex/ssl/private.key;
     
     # Frontend
     location / {
@@ -176,10 +176,10 @@ EOF
 
 1. Go to Observium → Settings → Alerts → Alert Transports
 2. Create new **Webhook** transport:
-   - **URL**: `https://cyberops.internal/api/alerts`
+   - **URL**: `https://vortex.internal/api/alerts`
    - **Method**: POST
 3. Create Alert Rule and assign the webhook
-4. Test alert - should appear in ITops **Alerts** page within seconds
+4. Test alert - should appear in Vortex **Alerts** page within seconds
 
 ### Configure RFID Access Control
 
@@ -204,7 +204,7 @@ EOF
 
 ```bash
 # Service Management
-cd /opt/itops
+cd /opt/vortex
 docker-compose up -d          # Start all services
 docker-compose down           # Stop all services
 docker-compose restart        # Restart all services
@@ -216,12 +216,12 @@ docker-compose logs -f frontend   # View live frontend logs
 docker-compose logs | tail -100   # Last 100 lines all services
 
 # Database Operations
-docker-compose exec db psql -U itops_user -d itops -c "SELECT version();"
-docker-compose exec db pg_dump -U itops_user itops > backup.sql
+docker-compose exec db psql -U vortex_user -d vortex -c "SELECT version();"
+docker-compose exec db pg_dump -U vortex_user vortex > backup.sql
 
 # Backup & Restore
-cd /opt/itops && bash backup.sh               # Create backup
-gunzip < backup.sql.gz | docker-compose exec -T db psql -U itops_user -d itops
+cd /opt/vortex && bash backup.sh               # Create backup
+gunzip < backup.sql.gz | docker-compose exec -T db psql -U vortex_user -d vortex
 ```
 
 ---
@@ -276,7 +276,7 @@ docker-compose ps db
 docker-compose exec backend python setup_admin.py
 
 # Verify connection
-docker-compose exec db psql -U itops_user -c "SELECT 1"
+docker-compose exec db psql -U vortex_user -c "SELECT 1"
 ```
 
 ---

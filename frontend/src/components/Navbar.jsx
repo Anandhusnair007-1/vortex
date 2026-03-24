@@ -23,7 +23,7 @@ export const Navbar = () => {
             <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">IT</span>
             </div>
-            <span className="font-bold text-lg hidden sm:inline">ITops</span>
+            <span className="font-bold text-lg hidden sm:inline">Vortex</span>
           </Link>
 
           {/* Center - Title */}

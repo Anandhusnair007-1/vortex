@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ITops Platform - Admin Setup Script
+Vortex Platform - Admin Setup Script
 
 This script performs initial platform setup including:
 - Database initialization
@@ -58,7 +58,7 @@ def init_database():
         return False
 
 
-def create_admin(username="admin", email="admin@itops.local", password=None):
+def create_admin(username="admin", email="admin@vortex.local", password=None):
     """Create first admin user."""
     print("\n👤 Creating Admin User...")
     
@@ -110,25 +110,25 @@ def create_demo_users():
     demo_users = [
         {
             "username": "teamlead",
-            "email": "lead@itops.local",
+            "email": "lead@vortex.local",
             "role": "team-lead",
             "password": "teamlead123"
         },
         {
             "username": "engineer1",
-            "email": "engineer1@itops.local",
+            "email": "engineer1@vortex.local",
             "role": "engineer",
             "password": "engineer123"
         },
         {
             "username": "engineer2",
-            "email": "engineer2@itops.local",
+            "email": "engineer2@vortex.local",
             "role": "engineer",
             "password": "engineer123"
         },
         {
             "username": "viewer",
-            "email": "viewer@itops.local",
+            "email": "viewer@vortex.local",
             "role": "viewer",
             "password": "viewer123"
         }
@@ -267,7 +267,7 @@ def print_credentials():
 def main():
     """Run setup wizard."""
     print("\n" + "=" * 60)
-    print("  ITops Platform - Admin Setup")
+    print("  Vortex Platform - Admin Setup")
     print("=" * 60)
     
     # Parse arguments
@@ -320,7 +320,7 @@ def main():
     print_credentials()
     
     print("\n📝 Next Steps:")
-    print("   1. Access frontend at https://cyberops.internal")
+    print("   1. Access frontend at https://vortex.internal")
     print("   2. Login with admin credentials")
     print("   3. Create additional users in Settings → Users")
     print("   4. Configure Proxmox nodes in .env")

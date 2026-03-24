@@ -64,7 +64,7 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI app
 app = FastAPI(
-    title="ITops Platform",
+    title="Vortex Platform",
     description="Enterprise Cybersecurity Operations Platform",
     version="1.0.0",
     lifespan=lifespan
@@ -107,7 +107,7 @@ app.include_router(tasks.router, prefix="/api/tasks")
 async def root():
     """Root endpoint - redirects to docs"""
     return {
-        "message": "Welcome to ITops Platform",
+        "message": "Welcome to Vortex Platform",
         "docs": "/docs",
         "health": "/api/health"
     }

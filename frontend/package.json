@@ -1,7 +1,7 @@
 {
-  "name": "itops-frontend",
+  "name": "vortex-frontend",
   "version": "1.0.0",
-  "description": "ITops - Enterprise Cybersecurity Operations Platform",
+  "description": "Vortex - Enterprise Cybersecurity Operations Platform",
   "private": true,
   "dependencies": {
     "react": "^18.2.0",

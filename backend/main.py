@@ -12,6 +12,9 @@ from models import Base, PointsConfig
 from middleware.activity_logger import activity_logger_middleware
 from sqlalchemy.orm import Session
 
+# Import services
+from services.proxmox_sync import start_vm_sync_scheduler, stop_vm_sync_scheduler
+
 # Environment variables
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
@@ -43,8 +46,19 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
     
+    # Start Proxmox VM sync scheduler
+    vm_sync_enabled = os.getenv("ENABLE_VM_SYNC", "true").lower() == "true"
+    if vm_sync_enabled:
+        try:
+            start_vm_sync_scheduler()
+        except Exception as e:
+            print(f"⚠ VM Sync scheduler failed to start: {str(e)}")
+    
     print("✓ Database initialized successfully")
     yield
+    
+    # Cleanup on shutdown
+    stop_vm_sync_scheduler()
     print("✓ Application shutdown")
 
 

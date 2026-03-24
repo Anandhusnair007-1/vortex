@@ -1,6 +1,6 @@
-# Vortex Platform - Enterprise Cybersecurity Operations Dashboard
+# Vortex Platform - Enterprise IT Operations Dashboard
 
-A production-grade cybersecurity operations platform built with FastAPI, React, PostgreSQL, and Redis.
+A production-grade IT operations platform built with FastAPI, React, PostgreSQL, and Redis.
 
 ## Features
 

@@ -1,7 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from typing import Optional, List
-from enum import Enum
 from .user import UserOut
 from .vm_template import VmTemplateOut
 

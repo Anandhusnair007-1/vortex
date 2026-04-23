@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: itportal
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - vortex-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      network: host
+    network_mode: host
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5435/vortex_db
+      SECRET_KEY: ${SECRET_KEY:-3659c95df9391060932fd7a2fcc9754f9a0ad4bd443f068595955a1534015fbe}
+      ALGORITHM: HS256
+      VORTEX_ENCRYPTION_KEY: ${VORTEX_ENCRYPTION_KEY:-g70q0BLH83nDqaDSl-IlAPevS80PL4bsQAzRUOMDOZQ=}
+    depends_on:
+      - postgres
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      network: host
+    network_mode: host
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - backend
+
+networks:
+  vortex-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

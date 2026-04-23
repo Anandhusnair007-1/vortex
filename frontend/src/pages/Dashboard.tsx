@@ -3,14 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router-dom";
 import api from "../lib/api";
 import { VmRequest, User } from "../types";
-import { Plus, Server, Clock, XCircle, CheckCircle, Settings as SettingsIcon } from "lucide-react";
+import { Server, Clock, CheckCircle, Settings as SettingsIcon, ArrowRight } from "lucide-react";
 
 export default function Dashboard() {
   const user: User = JSON.parse(localStorage.getItem("user") || "{}");
   const location = useLocation();
   const role = user.role;
 
-  const isTeamLead = role === "TEAM_LEAD" || role === "IT_TEAM" || role === "ADMIN";
   const isIT = role === "IT_TEAM" || role === "ADMIN";
   const isAdmin = role === "ADMIN";
 
@@ -24,13 +23,13 @@ export default function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="p-6 bg-[#01060A] min-h-screen">
-        <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="p-6 bg-neo-bg min-h-screen">
+        <div className="grid grid-cols-4 gap-6 mb-8">
           {[1, 2, 3, 4].map(i => (
-            <div key={i} className="h-24 bg-[#043055] animate-pulse rounded-xl" />
+            <div key={i} className="h-28 neo-card bg-gray-200 animate-pulse" />
           ))}
         </div>
-        <div className="h-64 bg-[#043055] animate-pulse rounded-xl" />
+        <div className="h-64 neo-card bg-gray-200 animate-pulse" />
       </div>
     );
   }
@@ -40,148 +39,171 @@ export default function Dashboard() {
     active: requests?.filter(r => r.status === "ACTIVE").length || 0,
     pending: requests?.filter(r => r.status.startsWith("PENDING")).length || 0,
     provisioning: requests?.filter(r => r.status === "PROVISIONING").length || 0,
-    failed: requests?.filter(r => r.status === "FAILED" || r.status === "REJECTED").length || 0,
   };
 
   let filteredRequests = requests || [];
-  let pageTitle = "Dashboard";
+  let pageTitle = "DASH_BOARD";
 
   if (location.pathname === "/approvals") {
     if (isAdmin || isIT) {
       filteredRequests = filteredRequests.filter(r => r.status === "PENDING_IT");
-      pageTitle = "IT Approval Queue";
+      pageTitle = "IT_QUEUE";
     } else {
       filteredRequests = filteredRequests.filter(r => r.status === "PENDING_TL");
-      pageTitle = "Team Lead Approvals";
+      pageTitle = "TL_QUEUE";
     }
   } else if (location.pathname === "/provisioning") {
     filteredRequests = filteredRequests.filter(r => r.status === "PROVISIONING");
-    pageTitle = "Provisioning Queue";
+    pageTitle = "PROV_QUEUE";
   } else if (location.pathname === "/requests") {
     if (isAdmin || isIT) {
-      pageTitle = "All Requests";
+      pageTitle = "ALL_REQ";
     } else {
       filteredRequests = filteredRequests.filter(r => r.requester_id === user.id);
-      pageTitle = "My Requests";
+      pageTitle = "MY_REQ";
     }
   }
 
-  const getStatusColor = (status: string) => {
-    if (status === "ACTIVE") return "text-green-400 bg-green-400/10";
-    if (status.startsWith("PENDING")) return "text-yellow-400 bg-yellow-400/10";
-    if (status === "PROVISIONING") return "text-blue-400 bg-blue-400/10";
-    return "text-red-400 bg-red-400/10";
+  const getStatusBadge = (status: string) => {
+    if (status === "ACTIVE") return <span className="neo-badge bg-green-400 text-black border-neo-border">ACTIVE</span>;
+    if (status.startsWith("PENDING")) return <span className="neo-badge-orange">{status.replace("_", " ")}</span>;
+    if (status === "PROVISIONING") return <span className="neo-badge bg-blue-400 text-black border-neo-border">PROVISION</span>;
+    return <span className="neo-badge bg-red-500 text-white border-neo-border">{status}</span>;
   };
 
   return (
-    <div className="bg-[#01060A] min-h-screen text-gray-200 p-6 font-sans">
-      {/* Page Title */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">{pageTitle}</h1>
+    <div className="bg-neo-bg min-h-screen text-neo-text p-4 md:p-8 font-sans">
+      {/* Page Title & Top Header */}
+      <div className="mb-8 border-b-2 border-neo-border pb-4 flex justify-between items-end">
+        <div>
+          <p className="text-sm font-bold uppercase tracking-widest text-neo-muted mb-1 flex items-center gap-2">
+            <span className="w-2 h-2 bg-neo-orange inline-block"></span> VORTEX SYSTEM
+          </p>
+          <h1 className="text-6xl md:text-8xl font-pixel text-neo-text leading-none tracking-tighter uppercase">
+            {pageTitle}
+          </h1>
+        </div>
+        <div className="hidden md:block text-right">
+          <p className="text-xs font-mono font-bold uppercase tracking-widest bg-white border border-neo-border px-3 py-1 shadow-neo-sm">
+            USER: {user.name}
+          </p>
+        </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-[#043055] rounded-xl p-4 border border-[#459BCB]/10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[#459BCB]/20 flex items-center justify-center">
-              <Server size={20} className="text-[#459BCB]" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-white">{stats.total}</p>
-              <p className="text-xs text-gray-400">Total Requests</p>
-            </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
+        <div className="neo-card p-0 flex flex-col">
+          <div className="p-4 border-b border-neo-border flex justify-between items-center bg-gray-50">
+            <span className="text-xs font-bold uppercase tracking-widest">Total Req</span>
+            <Server size={16} strokeWidth={2.5} />
+          </div>
+          <div className="p-6 flex items-end justify-between">
+            <p className="text-5xl font-pixel">{stats.total}</p>
+            <p className="text-xs font-mono text-neo-muted mb-1">UNITS</p>
           </div>
         </div>
         
-        <div className="bg-[#043055] rounded-xl p-4 border border-[#459BCB]/10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-yellow-400/20 flex items-center justify-center">
-              <Clock size={20} className="text-yellow-400" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-white">{stats.pending}</p>
-              <p className="text-xs text-gray-400">Pending</p>
-            </div>
+        <div className="neo-card p-0 flex flex-col">
+          <div className="p-4 border-b border-neo-border flex justify-between items-center bg-neo-orange text-white">
+            <span className="text-xs font-bold uppercase tracking-widest">Pending</span>
+            <Clock size={16} strokeWidth={2.5} />
+          </div>
+          <div className="p-6 flex items-end justify-between">
+            <p className="text-5xl font-pixel">{stats.pending}</p>
+            <p className="text-xs font-mono text-neo-muted mb-1">AWAIT</p>
           </div>
         </div>
         
-        <div className="bg-[#043055] rounded-xl p-4 border border-[#459BCB]/10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-blue-400/20 flex items-center justify-center">
-              <Server size={20} className="text-blue-400" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-white">{stats.provisioning}</p>
-              <p className="text-xs text-gray-400">Provisioning</p>
-            </div>
+        <div className="neo-card p-0 flex flex-col">
+          <div className="p-4 border-b border-neo-border flex justify-between items-center bg-blue-400 text-black">
+            <span className="text-xs font-bold uppercase tracking-widest">Deploying</span>
+            <Server size={16} strokeWidth={2.5} />
+          </div>
+          <div className="p-6 flex items-end justify-between">
+            <p className="text-5xl font-pixel">{stats.provisioning}</p>
+            <p className="text-xs font-mono text-neo-muted mb-1">PROV</p>
           </div>
         </div>
         
-        <div className="bg-[#043055] rounded-xl p-4 border border-[#459BCB]/10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-green-400/20 flex items-center justify-center">
-              <CheckCircle size={20} className="text-green-400" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-white">{stats.active}</p>
-              <p className="text-xs text-gray-400">Active VMs</p>
-            </div>
+        <div className="neo-card p-0 flex flex-col">
+          <div className="p-4 border-b border-neo-border flex justify-between items-center bg-green-400 text-black">
+            <span className="text-xs font-bold uppercase tracking-widest">Active</span>
+            <CheckCircle size={16} strokeWidth={2.5} />
+          </div>
+          <div className="p-6 flex items-end justify-between">
+            <p className="text-5xl font-pixel">{stats.active}</p>
+            <p className="text-xs font-mono text-neo-muted mb-1">LIVE</p>
           </div>
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-[#043055] rounded-xl border border-[#459BCB]/10 overflow-hidden">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-[#01060A]/50 text-gray-400 text-xs">
-            <tr>
-              <th className="px-4 py-3">Request</th>
-              <th className="px-4 py-3">Template</th>
-              <th className="px-4 py-3">Requested By</th>
-              <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3 text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5">
-            {filteredRequests.map((req) => (
-              <tr key={req.id} className="hover:bg-white/5 transition">
-                <td className="px-4 py-3">
-                  <div>
-                    <p className="text-white font-medium">{req.title}</p>
-                    <p className="text-xs text-gray-500">{req.justification?.substring(0, 50)}...</p>
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-gray-300">
-                  {req.template?.name || "-"}
-                </td>
-                <td className="px-4 py-3 text-gray-300">
-                  {req.requester?.name || req.requester?.email || "Unknown"}
-                </td>
-                <td className="px-4 py-3 text-gray-400">
-                  {new Date(req.created_at).toLocaleDateString()}
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(req.status)}`}>
-                    {req.status.replace("_", " ")}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <Link to={`/request/${req.id}`} className="inline-flex items-center gap-1 text-gray-400 hover:text-white transition">
-                    <SettingsIcon size={14} />
-                    View
-                  </Link>
-                </td>
+      <div className="neo-card overflow-hidden">
+        <div className="bg-neo-text text-white p-3 border-b border-neo-border flex justify-between items-center">
+          <h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+            <span className="w-2 h-2 bg-white inline-block"></span> REQUEST LOG
+          </h2>
+          <span className="font-pixel text-xl">{filteredRequests.length.toString().padStart(2, '0')}</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm whitespace-nowrap">
+            <thead className="bg-gray-50 border-b border-neo-border text-xs font-bold uppercase tracking-widest">
+              <tr>
+                <th className="px-6 py-4 border-r border-neo-border">Request ID / Title</th>
+                <th className="px-6 py-4 border-r border-neo-border">Template</th>
+                <th className="px-6 py-4 border-r border-neo-border">User</th>
+                <th className="px-6 py-4 border-r border-neo-border">Date</th>
+                <th className="px-6 py-4 border-r border-neo-border">Status</th>
+                <th className="px-6 py-4 text-center">Action</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-neo-border">
+              {filteredRequests.map((req, idx) => (
+                <tr key={req.id} className="hover:bg-gray-50 transition-colors group">
+                  <td className="px-6 py-4 border-r border-neo-border">
+                    <div>
+                      <p className="font-bold text-neo-text group-hover:text-neo-orange transition-colors">
+                        {req.title}
+                      </p>
+                      <p className="text-xs font-mono text-neo-muted mt-1">
+                        REQ-{req.id.toString().padStart(4, '0')}
+                      </p>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 border-r border-neo-border font-mono text-sm">
+                    {req.template?.name || "-"}
+                  </td>
+                  <td className="px-6 py-4 border-r border-neo-border font-medium">
+                    {req.requester?.name || req.requester?.email || "Unknown"}
+                  </td>
+                  <td className="px-6 py-4 border-r border-neo-border font-mono text-sm">
+                    {new Date(req.created_at).toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4 border-r border-neo-border">
+                    {getStatusBadge(req.status)}
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <Link
+                      to={`/request/${req.id}`}
+                      className="inline-flex items-center justify-center w-8 h-8 border border-neo-border hover:bg-neo-orange hover:text-white hover:shadow-neo-sm transition-all"
+                      title="View Details"
+                    >
+                      <ArrowRight size={16} strokeWidth={2.5} />
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
         {filteredRequests.length === 0 && (
-          <div className="py-12 text-center text-gray-500">
-            <Server size={32} className="mx-auto mb-2 opacity-30" />
-            <p>No requests found</p>
+          <div className="py-20 text-center flex flex-col items-center justify-center border-t border-neo-border bg-gray-50">
+            <div className="w-16 h-16 border-2 border-neo-border border-dashed flex items-center justify-center mb-4 text-neo-muted">
+              <Server size={24} strokeWidth={2.5} />
+            </div>
+            <p className="font-bold uppercase tracking-widest text-neo-text">No Data Found</p>
+            <p className="text-sm font-mono text-neo-muted mt-2">Queue is currently empty</p>
           </div>
         )}
       </div>

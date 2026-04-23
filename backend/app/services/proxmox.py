@@ -60,7 +60,7 @@ async def provision_vm_real(request, template) -> dict:
             login_url = f"https://{proxmox_url}/api2/json/access/ticket"
             login_data = {"username": username, "password": password}
             
-            async with session.post(login_url, json=login_data, ssl=False) as resp:
+            async with session.post(login_url, json=login_data, ssl=settings.PROXMOX_VERIFY_SSL) as resp:
                 if resp.status != 200:
                     return {"success": False, "error": "Failed to authenticate with Proxmox"}
                 ticket_data = await resp.json()
@@ -90,7 +90,7 @@ async def provision_vm_real(request, template) -> dict:
                 "start": 1
             }
             
-            async with session.post(create_url, json=vm_config, headers=headers, ssl=False) as create_resp:
+            async with session.post(create_url, json=vm_config, headers=headers, ssl=settings.PROXMOX_VERIFY_SSL) as create_resp:
                 if create_resp.status != 200:
                     error = await create_resp.text()
                     return {"success": False, "error": f"Failed to create VM: {error}"}
@@ -128,13 +128,13 @@ async def get_proxmoxVMs() -> list:
     async with aiohttp.ClientSession() as session:
         try:
             login_url = f"https://{proxmox_url}/api2/json/access/ticket"
-            async with session.post(login_url, json={"username": username, "password": password}, ssl=False) as resp:
+            async with session.post(login_url, json={"username": username, "password": password}, ssl=settings.PROXMOX_VERIFY_SSL) as resp:
                 ticket_data = await resp.json()
                 ticket = ticket_data.get("data", {}).get("ticket")
             
             headers = {"Cookie": f"PVEAuthCookie={ticket}"}
             list_url = f"https://{proxmox_url}/api2/json/nodes/{node}/qemu"
-            async with session.get(list_url, headers=headers, ssl=False) as resp:
+            async with session.get(list_url, headers=headers, ssl=settings.PROXMOX_VERIFY_SSL) as resp:
                 data = await resp.json()
                 return data.get("data", [])
         except:
@@ -152,7 +152,7 @@ async def delete_proxmox_vm(vm_id: int, node: str = None) -> dict:
     async with aiohttp.ClientSession() as session:
         try:
             login_url = f"https://{proxmox_url}/api2/json/access/ticket"
-            async with session.post(login_url, json={"username": username, "password": password}, ssl=False) as resp:
+            async with session.post(login_url, json={"username": username, "password": password}, ssl=settings.PROXMOX_VERIFY_SSL) as resp:
                 ticket_data = await resp.json()
                 csrf_token = ticket_data.get("data", {}).get("CSRFPreventionToken")
                 ticket = ticket_data.get("data", {}).get("ticket")
@@ -163,7 +163,7 @@ async def delete_proxmox_vm(vm_id: int, node: str = None) -> dict:
             }
             
             delete_url = f"https://{proxmox_url}/api2/json/nodes/{node}/qemu/{vm_id}"
-            async with session.delete(delete_url, headers=headers, ssl=False) as resp:
+            async with session.delete(delete_url, headers=headers, ssl=settings.PROXMOX_VERIFY_SSL) as resp:
                 return {"success": resp.status == 200}
         except Exception as e:
             return {"success": False, "error": str(e)}

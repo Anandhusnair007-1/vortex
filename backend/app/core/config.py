@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     PROXMOX_USER: Optional[str] = None
     PROXMOX_PASSWORD: Optional[str] = None
     PROXMOX_NODE: Optional[str] = None
+    PROXMOX_VERIFY_SSL: bool = True
     
     SMTP_HOST: Optional[str] = None
     SMTP_PORT: int = 587

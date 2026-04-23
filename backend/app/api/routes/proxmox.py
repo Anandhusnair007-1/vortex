@@ -17,7 +17,7 @@ class ProxmoxConnectionTestIn(BaseModel):
     username: str
     password: str
     node: Optional[str] = None
-    verify_ssl: bool = False
+    verify_ssl: bool = True
 
 
 @router.post("/test-connection")

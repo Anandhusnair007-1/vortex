@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 
 import { TopNavbar } from './components/TopNavbar';
 import { getCurrentUser } from './services/api';
-import { Dashboard } from './pages/Dashboard';
+import Dashboard from "./pages/Dashboard";
 import { LoginPage } from './pages/LoginPage';
 import { VMPage } from './pages/VMPage';
 import { RFIDPage } from './pages/RFIDPage';

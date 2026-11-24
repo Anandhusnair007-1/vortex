@@ -9,7 +9,8 @@ import {
   Server,
   Users2, 
   Settings as SettingsIcon,
-  LogOut
+  LogOut,
+  Menu
 } from "lucide-react";
 import { User } from "../types";
 import { useAuth } from "../hooks/useAuth";
@@ -24,26 +25,26 @@ const Sidebar: React.FC = () => {
   const isTeamLead = role === "TEAM_LEAD";
 
   const navItems: { to: string; label: string; icon: React.ReactNode }[] = [
-    { to: "/dashboard", label: "Dashboard", icon: <Home size={22} /> },
-    { to: "/request/new", label: "New Request", icon: <Building2 size={22} /> },
+    { to: "/dashboard", label: "Home", icon: <Home size={20} strokeWidth={2.5} /> },
+    { to: "/request/new", label: "Apply", icon: <Building2 size={20} strokeWidth={2.5} /> },
   ];
 
   if (isTeamLead || isAdmin) {
     navItems.push(
-      { to: "/approvals", label: "Approvals", icon: <ClipboardCheck size={22} /> }
+      { to: "/approvals", label: "Approve", icon: <ClipboardCheck size={20} strokeWidth={2.5} /> }
     );
   }
 
   navItems.push(
-    { to: "/requests", label: "All Requests", icon: <FileStack size={22} /> }
+    { to: "/requests", label: "Log", icon: <FileStack size={20} strokeWidth={2.5} /> }
   );
 
   if (isAdmin) {
     navItems.push(
-      { to: "/admin/templates", label: "VM Templates", icon: <Library size={22} /> },
-      { to: "/admin/proxmox", label: "Servers", icon: <Server size={22} /> },
-      { to: "/admin/users", label: "Users", icon: <Users2 size={22} /> },
-      { to: "/admin/settings", label: "Settings", icon: <SettingsIcon size={22} /> }
+      { to: "/admin/templates", label: "Tmpl", icon: <Library size={20} strokeWidth={2.5} /> },
+      { to: "/admin/proxmox", label: "Nodes", icon: <Server size={20} strokeWidth={2.5} /> },
+      { to: "/admin/users", label: "Users", icon: <Users2 size={20} strokeWidth={2.5} /> },
+      { to: "/admin/settings", label: "Cfg", icon: <SettingsIcon size={20} strokeWidth={2.5} /> }
     );
   }
 
@@ -53,21 +54,31 @@ const Sidebar: React.FC = () => {
   };
 
   return (
-    <aside className="w-[88px] bg-[#01060A] min-h-screen py-8 flex flex-col items-center sticky top-0 z-40 border-r border-[#459BCB]/10">
-      <div className="flex flex-col items-center gap-1 w-full">
+    <aside className="w-[88px] bg-neo-card min-h-screen py-0 flex flex-col items-center sticky top-0 z-40 border-r border-neo-border">
+      {/* Top Logo / Menu Icon Area */}
+      <div className="w-full h-[88px] border-b border-neo-border flex items-center justify-center bg-neo-orange text-white">
+         <Menu size={28} strokeWidth={2.5} />
+      </div>
+
+      <div className="flex flex-col items-center w-full mt-4 gap-2">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             className={({ isActive }) =>
-              `relative group flex flex-col items-center justify-center w-full py-5 transition-all duration-300 ${
-                isActive ? "text-[#459BCB]" : "text-gray-500 hover:text-white"
+              `relative group flex flex-col items-center justify-center w-[64px] h-[64px] transition-all border ${
+                isActive
+                  ? "bg-neo-bg text-neo-orange border-neo-border shadow-neo-sm"
+                  : "bg-white text-neo-text border-transparent hover:border-neo-border hover:shadow-neo-sm"
               }`
             }
           >
             <div className="flex flex-col items-center gap-1">
               {item.icon}
-              <div className="absolute left-[88px] top-1/2 -translate-y-1/2 bg-[#043055] text-[10px] font-bold uppercase text-white px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-300 z-50 whitespace-nowrap">
+              <span className="text-[9px] font-bold uppercase tracking-widest mt-1">
+                {item.label}
+              </span>
+              <div className="absolute left-[72px] top-1/2 -translate-y-1/2 bg-neo-text text-[10px] font-bold uppercase text-white px-3 py-1.5 opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 whitespace-nowrap border border-neo-border shadow-neo">
                 {item.label}
               </div>
             </div>
@@ -75,20 +86,23 @@ const Sidebar: React.FC = () => {
         ))}
       </div>
 
-      <div className="mt-auto flex flex-col items-center w-full">
+      <div className="mt-auto flex flex-col items-center w-full border-t border-neo-border pt-4 bg-white">
         <button 
           onClick={handleLogout}
-          className="flex flex-col items-center justify-center w-full py-5 text-gray-500 hover:text-red-400 transition-all"
+          className="relative group flex flex-col items-center justify-center w-[64px] h-[64px] bg-white text-neo-text border border-transparent hover:border-neo-border hover:shadow-neo-sm hover:text-red-600 transition-all mb-4"
         >
-          <LogOut size={22} />
-          <div className="absolute left-[88px] top-1/2 -translate-y-1/2 bg-[#043055] text-[10px] font-bold uppercase text-white px-3 py-1.5 rounded-lg opacity-0 hover:opacity-100 pointer-events-none transition-all duration-300 z-50 whitespace-nowrap">
+          <LogOut size={20} strokeWidth={2.5} />
+          <span className="text-[9px] font-bold uppercase tracking-widest mt-1">
+            Exit
+          </span>
+          <div className="absolute left-[72px] top-1/2 -translate-y-1/2 bg-red-600 text-[10px] font-bold uppercase text-white px-3 py-1.5 opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 whitespace-nowrap border border-neo-border shadow-neo">
             Logout
           </div>
         </button>
 
-        <div className="mt-4 pb-8 flex flex-col items-center gap-3 w-full">
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#2578B1] to-[#459BCB] flex items-center justify-center font-bold text-[#01060A] text-sm">
-            {user.name?.[0] || "U"}
+        <div className="w-full border-t border-neo-border p-4 flex justify-center bg-neo-bg">
+          <div className="w-10 h-10 bg-white border border-neo-border shadow-neo-sm flex items-center justify-center font-bold text-neo-text text-sm">
+            {user.name?.[0]?.toUpperCase() || "U"}
           </div>
         </div>
       </div>

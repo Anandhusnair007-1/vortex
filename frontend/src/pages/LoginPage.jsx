@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Eye, EyeOff, LockKeyhole, LoaderCircle, Shield, User } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, LockKeyhole, Loader2, Shield, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import { login } from '../services/api';
@@ -163,7 +163,7 @@ export function LoginPage() {
                   disabled={submitting}
                   className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#8e72ff,#6b5adb)] text-sm font-semibold text-white shadow-[0_18px_36px_rgba(104,87,208,0.28)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                   {submitting ? 'Signing In...' : 'Sign In'}
                 </button>
 
